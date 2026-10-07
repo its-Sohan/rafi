@@ -154,6 +154,12 @@ export const unitMarginPercent = (product: Product) => product.price > 0 ? (unit
 export const lineTotal = (price: number, quantity: number) => Math.round(price * quantity / 1000)
 export const lineCost = (cost: number, quantity: number) => Math.round(cost * quantity / 1000)
 export const lineProfit = (product: Product, quantity: number) => lineTotal(product.price, quantity) - lineCost(productCost(product), quantity)
+export function receiptProfit(receipt: Receipt): number {
+  const marginSum = receipt.lines.reduce((sum, line) => {
+    return sum + lineProfit(line.product, line.quantity)
+  }, 0)
+  return Math.max(0, marginSum - (receipt.discount || 0))
+}
 
 export const subtotal = (lines: Line[], catalog: Product[] = products) => lines.reduce((sum, line) => sum + lineTotal(findProductIn(line.productId, catalog).price, line.quantity), 0)
 export const money = (minor: number) => (minor / 100).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })

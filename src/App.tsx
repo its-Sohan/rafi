@@ -18,6 +18,7 @@ import {
   quantityText,
   stockFor,
   subtotal,
+  receiptProfit,
   filterReceiptsByWindow,
   unitMargin,
   unitMarginPercent,
@@ -363,6 +364,7 @@ export default function App() {
   const windowReceipts = filterReceiptsByWindow(state.receipts, reportWindow, now)
   const windowSales = windowReceipts.reduce((s, r) => s + r.total, 0)
   const windowPaid = windowReceipts.reduce((s, r) => s + r.paid, 0)
+  const windowProfit = windowReceipts.reduce((s, r) => s + receiptProfit(r), 0)
   const pendingDue = customerCatalog.reduce((sum, c) => sum + customerBalance(c, state.receipts, state.transactions).totalDue, 0)
   const paidAmount = parseMoney(received) ?? 0
   const goSearch = () => { setQuantityProduct(null); setInputError(''); requestAnimationFrame(() => searchRef.current?.focus()) }
@@ -435,7 +437,7 @@ export default function App() {
   const exportBackup = () => { downloadJson({ version: 1, exportedAt: new Date().toISOString(), products, customers, state }, `hisab-backup-${dayKey(now)}.json`); notify('backupExported') }
   const exportCsv = () => {
     const listToExport = windowReceipts
-    const rows = [['Receipt', 'Date (UTC)', 'Total (BDT)', 'Paid (BDT)', 'Due (BDT)', 'Method'], ...listToExport.map(r => [receiptNumber(r.number), r.createdAt, (r.total / 100).toFixed(2), (r.paid / 100).toFixed(2), (r.due / 100).toFixed(2), r.method])]
+    const rows = [['Receipt', 'Date (UTC)', 'Total (BDT)', 'Profit (BDT)', 'Paid (BDT)', 'Due (BDT)', 'Method'], ...listToExport.map(r => [receiptNumber(r.number), r.createdAt, (r.total / 100).toFixed(2), (receiptProfit(r) / 100).toFixed(2), (r.paid / 100).toFixed(2), (r.due / 100).toFixed(2), r.method])]
     const url = URL.createObjectURL(new Blob([rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' }))
     const a = document.createElement('a'); a.href = url; a.download = `hisab-sales-${reportWindow}-${dayKey(now)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
@@ -557,6 +559,7 @@ export default function App() {
             { label: 'totalSales', value: `৳ ${money(state.receipts.reduce((s, r) => s + r.total, 0))}`, icon: 'reports' },
           ] : [
             { label: reportWindow === 'today' ? 'salesToday' : 'salesInWindow', value: `৳ ${money(windowSales)}`, icon: 'reports' },
+            { label: reportWindow === 'today' ? 'profitToday' : 'profitInWindow', value: `৳ ${money(windowProfit)}`, icon: 'cash' },
             { label: reportWindow === 'today' ? 'collected' : 'collectedInWindow', value: `৳ ${money(windowPaid)}`, icon: 'cash' },
             { label: reportWindow === 'today' ? 'receiptsToday' : 'receiptsInWindow', value: String(windowReceipts.length), icon: 'sales' },
           ]).map(metric => <div className="metric-card" key={metric.label}><div><span className="eyebrow">{t(metric.label as CopyKey)}</span><Icon name={metric.icon}/></div><strong>{metric.value}</strong></div>)}</div>
