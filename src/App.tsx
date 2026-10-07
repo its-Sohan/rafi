@@ -9,6 +9,7 @@ import {
   findProductIn,
   initialState,
   lineTotal,
+  lineProfit,
   makeReceipt,
   money,
   parseMoney,
@@ -37,7 +38,7 @@ import { translator, type CopyKey } from './i18n'
 import type { OfflineStatus } from './offline'
 
 type View = 'sales' | 'inventory' | 'accounts' | 'reports'
-type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | null
+type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | 'itemStats' | null
 const receiptNumber = (n: number) => String(n).padStart(4, '0')
 const dayKey = (date: string | Date) => new Date(date).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
 
@@ -190,10 +191,6 @@ export default function App() {
       setModalError(t('fillRequired'))
       return
     }
-    if (catalog.some(p => p.code.toLowerCase() === codeTrim.toLowerCase())) {
-      setModalError(t('codeExists'))
-      return
-    }
     const parsedPrice = parseMoney(newPrice)
     if (parsedPrice === null || parsedPrice <= 0) {
       setModalError(t('invalidAmount'))
@@ -207,6 +204,45 @@ export default function App() {
     const parsedPurchased = parseQuantity(newPurchased, newUnit)
     if (parsedPurchased === null || parsedPurchased <= 0) {
       setModalError(t('invalidQuantity'))
+      return
+    }
+
+    const existing = catalog.find(p => p.code.toLowerCase() === codeTrim.toLowerCase())
+
+    if (existing) {
+      // Weighted Average Cost merge
+      const currentStock = stockFor(existing, state.receipts)
+      const currentUnitCost = productCost(existing)
+      const incomingStock = parsedPurchased
+      const incomingUnitCost = parsedCost
+      const totalStock = currentStock + incomingStock
+
+      const currentCostValue = (currentStock / 1000) * currentUnitCost
+      const incomingCostValue = (incomingStock / 1000) * incomingUnitCost
+      const blendedUnitCost = totalStock > 0 ? Math.round((currentCostValue + incomingCostValue) / (totalStock / 1000)) : incomingUnitCost
+
+      const mergedProd: Product = {
+        ...existing,
+        en: enTrim,
+        bn: bnTrim,
+        detail: detailTrim,
+        detailBn: detailTrim,
+        category: newCategory,
+        unit: newUnit,
+        price: parsedPrice,
+        cost: blendedUnitCost,
+        stock: existing.stock + incomingStock,
+        purchased: (existing.purchased ?? existing.stock) + incomingStock,
+      }
+
+      const prevCustom = state.customProducts ?? []
+      const updatedCustom = prevCustom.some(p => p.id === existing.id)
+        ? prevCustom.map(p => p.id === existing.id ? mergedProd : p)
+        : [...prevCustom, mergedProd]
+
+      setState(s => ({ ...s, customProducts: updatedCustom }))
+      closeDialog()
+      setToast({ text: t('itemRestocked') })
       return
     }
 
@@ -241,6 +277,8 @@ export default function App() {
   const [newCustCreditLimit, setNewCustCreditLimit] = useState('5000')
   const [newCustOpeningDue, setNewCustOpeningDue] = useState('0')
   const [activeCustomer, setActiveCustomer] = useState<Customer | null>(null)
+  const [activeReportProduct, setActiveReportProduct] = useState<Product | null>(null)
+  const [reportsSubView, setReportsSubView] = useState<'sales' | 'products'>('sales')
 
   // Transaction record modal state
   const [txType, setTxType] = useState<AccountTransaction['type']>('payment')
@@ -584,6 +622,14 @@ export default function App() {
                       <option value="month">{t('windowMonth')}</option>
                     </select>
                   </div>
+                  <div className="reports-tab-toggle" role="tablist" aria-label="Report views">
+                    <button type="button" role="tab" aria-selected={reportsSubView === 'sales'} className={reportsSubView === 'sales' ? 'active' : ''} onClick={() => setReportsSubView('sales')}>
+                      <Icon name="reports" size={13}/><span>{t('reportsTabsSales')}</span>
+                    </button>
+                    <button type="button" role="tab" aria-selected={reportsSubView === 'products'} className={reportsSubView === 'products' ? 'active' : ''} onClick={() => setReportsSubView('products')}>
+                      <Icon name="inventory" size={13}/><span>{t('reportsTabsProducts')}</span>
+                    </button>
+                  </div>
                   <button className="text-button" onClick={exportCsv}><Icon name="download" size={16}/>{t('exportCsv')}</button>
                 </>}
               </div>
@@ -612,7 +658,83 @@ export default function App() {
                 <td><span className="tx-badge payment">৳ {money(b.availableCredit)}</span></td>
                 <td><button className="icon-button" aria-label={`${t('viewProfile')}: ${c[lang]}`} onClick={() => openCustomerProfile(c)}><Icon name="chevron" size={16}/></button></td>
               </tr>
-            })}</tbody></table></div> : windowReceipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th>{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...windowReceipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td>৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
+            })}</tbody></table></div> : reportsSubView === 'products' ? (() => {
+              // Calculate per-item performance within selected window
+              const productStatsList = catalog.map(p => {
+                let units = 0
+                let revenue = 0
+                let profit = 0
+                let orderCount = 0
+
+                for (const r of windowReceipts) {
+                  let foundInReceipt = false
+                  for (const line of r.lines) {
+                    if (line.productId === p.id) {
+                      foundInReceipt = true
+                      units += line.quantity
+                      revenue += lineTotal(line.product.price, line.quantity)
+                      profit += lineProfit(line.product, line.quantity)
+                    }
+                  }
+                  if (foundInReceipt) orderCount++
+                }
+
+                return {
+                  product: p,
+                  units,
+                  revenue,
+                  profit,
+                  orderCount,
+                }
+              }).sort((a, b) => b.revenue - a.revenue)
+
+              return <div className="data-table-wrap">
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>{t('product')}</th>
+                      <th>{t('code')}</th>
+                      <th>{t('unitsSold')}</th>
+                      <th>{t('itemRevenue')}</th>
+                      <th>{t('itemProfit')}</th>
+                      <th>{t('unitProfitLabel')}</th>
+                      <th>{t('salesOccurrences')}</th>
+                      <th/>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {productStatsList.map(({ product: p, units, revenue, profit, orderCount }) => {
+                      const m = unitMargin(p)
+                      const mPct = unitMarginPercent(p)
+                      return (
+                        <tr key={p.id} className="clickable-row" onClick={() => { setActiveReportProduct(p); openDialog('itemStats') }}>
+                          <td>
+                            <div className="inventory-product">
+                              <ProductArt product={p}/>
+                              <span>
+                                <strong>{p[lang]}</strong>
+                                <small>{lang === 'en' ? p.detail : p.detailBn}</small>
+                              </span>
+                            </div>
+                          </td>
+                          <td><code>{p.code}</code></td>
+                          <td><strong>{quantityText(units)}</strong> <small>{p.unit}</small></td>
+                          <td>৳ {money(revenue)}</td>
+                          <td><span className="profit-text">৳ {money(profit)}</span></td>
+                          <td><span className="margin-badge">৳ {money(m)} ({mPct.toFixed(0)}%)</span></td>
+                          <td>{orderCount}</td>
+                          <td>
+                            <button className="icon-button" aria-label={`${t('viewItemStats')}: ${p[lang]}`} onClick={e => { e.stopPropagation(); setActiveReportProduct(p); openDialog('itemStats') }}>
+                              <Icon name="chevron" size={16}/>
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            })() : windowReceipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th>{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...windowReceipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td>৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
             <div className="data-footnote">{t(view === 'inventory' ? 'catalogNote' : view === 'accounts' ? 'accountNote' : 'reportNote')}</div>
           </div>{view === 'accounts' && <p className="phase-note">{t('cashbookNote')}</p>}
         </section>}
@@ -625,7 +747,7 @@ export default function App() {
 
     {toast && <div className="toast" role="status"><Icon name="check" size={16}/><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null) }}>{t('undo')}</button>}<button className="icon-button" aria-label={t('close')} onClick={() => setToast(null)}><Icon name="close" size={13}/></button></div>}
 
-    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : dialog === 'newCustomer' ? 'newCustomer' : dialog === 'customerProfile' ? 'customerProfile' : dialog === 'addTx' ? 'addTransaction' : 'receipt')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
+    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : dialog === 'newCustomer' ? 'newCustomer' : dialog === 'customerProfile' ? 'customerProfile' : dialog === 'addTx' ? 'addTransaction' : dialog === 'itemStats' ? 'itemOverview' : 'receipt')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
       {dialog === 'payment' && <form onSubmit={e => { e.preventDefault(); completeSale() }}><div className="eyebrow modal-eyebrow">{t('counter')}<span> / </span>#{receiptNumber(state.receipts.length + 1)}</div><h3>{t('payment')}<span className="heading-dot">.</span></h3><div className="payment-total"><span>{t('total')}</span><strong><small>৳</small>{money(billTotal)}</strong><span>{customer ? customer[lang] : t('walkIn')} · {state.lines.length} {t('items')}</span></div><div className="payment-methods" aria-label={t('method')}>{(['cash', 'mobile', 'bank'] as const).map(method => <button key={method} type="button" className={method === paymentMethod ? 'active' : ''} onClick={() => { setPaymentMethod(method); setModalError('') }} aria-pressed={method === paymentMethod}><Icon name={method}/>{t(method)}</button>)}</div><div className="payment-input-label"><label htmlFor="received">{t('received')}</label><button type="button" className="text-button" onClick={() => setReceived((billTotal / 100).toFixed(2))}>{t('exact')}</button></div><div className="money-input"><span>৳</span><input id="received" inputMode="decimal" value={received} onChange={e => { setReceived(e.target.value); setModalError('') }} aria-invalid={!!modalError} aria-describedby={modalError ? 'payment-error' : undefined}/><small>BDT</small></div><div className={`change-row ${paidAmount < billTotal ? 'due' : ''}`}><span>{t(paidAmount < billTotal ? 'due' : 'change')}</span><strong>৳ {money(Math.abs(paidAmount - billTotal))}</strong></div>{modalError && <p className="field-error" id="payment-error" role="alert">{modalError}</p>}<button className="primary-button" type="submit" disabled={busy}><span>{t(busy ? 'completing' : 'complete')}</span><kbd>↵</kbd></button><p className="dialog-note">{t('paymentNote')}</p></form>}
 
       {dialog === 'customer' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('chooseCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('customerHint')}</p><div className="search-box"><Icon name="search" size={19}/><input aria-label={t('customerSearch')} placeholder={t('customerSearch')} value={customerQuery} onChange={e => setCustomerQuery(e.target.value)}/></div><div className="customer-options"><button onClick={() => { setState(s => ({ ...s, customerId: null })); closeDialog() }}><span className="initial-avatar"><Icon name="accounts"/></span><span><strong>{t('walkIn')}</strong><small>—</small></span>{!customer && <Icon name="check"/>}</button>{customerCatalog.filter(c => `${c.en} ${c.bn} ${c.phone}`.toLowerCase().includes(customerQuery.toLowerCase())).map(c => <button key={c.id} onClick={() => { setState(s => ({ ...s, customerId: c.id })); closeDialog() }}><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><span><strong>{c[lang]}</strong><small>{c.phone}</small></span>{customer?.id === c.id && <Icon name="check"/>}</button>)}</div></>}
@@ -644,7 +766,21 @@ export default function App() {
         <div className="form-grid">
           <div className="form-group">
             <label htmlFor="item-code">{t('code')} *</label>
-            <input id="item-code" className="form-input" value={newCode} onChange={e => { setNewCode(e.target.value); setModalError('') }} placeholder="e.g. 113" autoFocus required/>
+            <input id="item-code" className="form-input" value={newCode} onChange={e => {
+              const val = e.target.value
+              setNewCode(val)
+              setModalError('')
+              const matched = catalog.find(p => p.code.toLowerCase() === val.trim().toLowerCase())
+              if (matched) {
+                setNewNameEn(matched.en)
+                setNewNameBn(matched.bn)
+                setNewDetail(matched.detail)
+                setNewCategory(matched.category)
+                setNewUnit(matched.unit)
+                if (!newCost) setNewCost((productCost(matched) / 100).toFixed(2))
+                if (!newPrice) setNewPrice((matched.price / 100).toFixed(2))
+              }
+            }} placeholder="e.g. 113" autoFocus required/>
           </div>
           <div className="form-group">
             <label htmlFor="item-category">{t('categoryLabel')}</label>
@@ -689,8 +825,52 @@ export default function App() {
         </div>
 
         {(() => {
+          const existingItem = catalog.find(p => p.code.toLowerCase() === newCode.trim().toLowerCase())
           const c = parseMoney(newCost)
           const p = parseMoney(newPrice)
+          const incomingQty = parseQuantity(newPurchased, newUnit)
+
+          if (existingItem && c !== null && p !== null && incomingQty !== null) {
+            const currentStock = stockFor(existingItem, state.receipts)
+            const currentUnitCost = productCost(existingItem)
+            const totalStock = currentStock + incomingQty
+            const currentVal = (currentStock / 1000) * currentUnitCost
+            const incomingVal = (incomingQty / 1000) * c
+            const blendedCost = totalStock > 0 ? Math.round((currentVal + incomingVal) / (totalStock / 1000)) : c
+            const margin = p - blendedCost
+            const pct = p > 0 ? (margin / p) * 100 : 0
+
+            return <div className="restock-box">
+              <div className="restock-box-header">
+                <span className="restock-box-badge">{t('restockBadge')}</span>
+                <span>{existingItem[lang]} (<code>{existingItem.code}</code>)</span>
+              </div>
+              <p className="restock-box-desc">{t('restockNotice')}</p>
+              <div className="restock-grid">
+                <div>
+                  <small>{t('currentStockLabel')}</small>
+                  <strong>{quantityText(currentStock)} {existingItem.unit} @ ৳ {money(currentUnitCost)}</strong>
+                </div>
+                <div>
+                  <small>{t('incomingStockLabel')}</small>
+                  <strong>+{quantityText(incomingQty)} {newUnit} @ ৳ {money(c)}</strong>
+                </div>
+                <div>
+                  <small>{t('blendedCostLabel')}</small>
+                  <strong>৳ {money(blendedCost)} / {newUnit}</strong>
+                </div>
+                <div>
+                  <small>{t('newStockLabel')}</small>
+                  <strong>{quantityText(totalStock)} {newUnit}</strong>
+                </div>
+              </div>
+              <div className="margin-preview" style={{ marginTop: '10px' }}>
+                <span>{t('unitMargin')} ({t('blendedCostLabel')}):</span>
+                <strong>৳ {money(margin)} ({pct.toFixed(1)}%)</strong>
+              </div>
+            </div>
+          }
+
           if (c !== null && p !== null) {
             const m = p - c
             const pct = p > 0 ? (m / p) * 100 : 0
@@ -802,6 +982,160 @@ export default function App() {
                 ))}
               </tbody>
             </table> : <div className="empty-state" style={{ minHeight: 120, padding: 20 }}><p>{t('noTx')}</p></div>}
+          </div>
+
+          <div className="dialog-actions">
+            <button className="secondary-button" type="button" onClick={closeDialog}>{t('close')}</button>
+          </div>
+        </>
+      })()}
+
+      {dialog === 'itemStats' && activeReportProduct && (() => {
+        const p = activeReportProduct
+        const cost = productCost(p)
+        const margin = unitMargin(p)
+        const marginPct = unitMarginPercent(p)
+
+        // Find all receipts containing this product in the selected window
+        type ItemSaleRecord = {
+          receipt: Receipt
+          quantity: number
+          total: number
+          profit: number
+          time: string
+          customerName: string
+        }
+
+        const itemSales: ItemSaleRecord[] = []
+        const coPurchaseMap = new Map<string, { product: Product; count: number }>()
+        let totalSoldUnits = 0
+        let totalRevenue = 0
+        let totalProfit = 0
+
+        for (const r of windowReceipts) {
+          const matchingLines = r.lines.filter(l => l.productId === p.id)
+          if (!matchingLines.length) continue
+
+          const lineQty = matchingLines.reduce((sum, l) => sum + l.quantity, 0)
+          const lineRev = matchingLines.reduce((sum, l) => sum + lineTotal(l.product.price, l.quantity), 0)
+          const lineProf = matchingLines.reduce((sum, l) => sum + lineProfit(l.product, l.quantity), 0)
+
+          totalSoldUnits += lineQty
+          totalRevenue += lineRev
+          totalProfit += lineProf
+
+          itemSales.push({
+            receipt: r,
+            quantity: lineQty,
+            total: lineRev,
+            profit: lineProf,
+            time: r.createdAt,
+            customerName: r.customer ? r.customer[lang] : t('walkIn'),
+          })
+
+          // Track frequently bought with
+          for (const otherLine of r.lines) {
+            if (otherLine.productId !== p.id) {
+              const cur = coPurchaseMap.get(otherLine.productId) ?? { product: otherLine.product, count: 0 }
+              cur.count += 1
+              coPurchaseMap.set(otherLine.productId, cur)
+            }
+          }
+        }
+
+        const topCoPurchases = Array.from(coPurchaseMap.values())
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 4)
+
+        return <>
+          <div className="eyebrow modal-eyebrow">{t('reports')}<span> / </span>{t('itemOverview')}</div>
+          <div className="customer-profile-header">
+            <div className="item-profile-art"><ProductArt product={p}/></div>
+            <div className="customer-profile-info">
+              <h3>{p[lang]}<span className="heading-dot">.</span></h3>
+              <p><code>{p.code}</code> · {lang === 'en' ? p.detail : p.detailBn} · ৳ {money(p.price)} / {p.unit}</p>
+            </div>
+          </div>
+
+          <div className="customer-stats-grid">
+            <div className="customer-stat-card">
+              <span>{t('unitsSold')}</span>
+              <strong>{quantityText(totalSoldUnits)} <small>{p.unit}</small></strong>
+            </div>
+            <div className="customer-stat-card">
+              <span>{t('itemRevenue')}</span>
+              <strong>৳ {money(totalRevenue)}</strong>
+            </div>
+            <div className="customer-stat-card credit">
+              <span>{t('itemProfit')}</span>
+              <strong>৳ {money(totalProfit)}</strong>
+            </div>
+          </div>
+
+          <div className="item-detail-cards-grid">
+            <div className="item-detail-subcard">
+              <span className="eyebrow">{t('cost')}</span>
+              <strong>৳ {money(cost)} / {p.unit}</strong>
+            </div>
+            <div className="item-detail-subcard">
+              <span className="eyebrow">{t('sellingPrice')}</span>
+              <strong>৳ {money(p.price)} / {p.unit}</strong>
+            </div>
+            <div className="item-detail-subcard">
+              <span className="eyebrow">{t('unitMargin')}</span>
+              <strong style={{ color: '#2e6b36' }}>৳ {money(margin)} ({marginPct.toFixed(0)}%)</strong>
+            </div>
+            <div className="item-detail-subcard">
+              <span className="eyebrow">{t('stock')}</span>
+              <strong>{quantityText(stockFor(p, state.receipts))} {p.unit}</strong>
+            </div>
+          </div>
+
+          {topCoPurchases.length > 0 && <div className="co-purchase-section">
+            <span className="eyebrow" style={{ marginBottom: 8 }}>{t('frequencyBought')}</span>
+            <div className="co-purchase-chips">
+              {topCoPurchases.map(cp => (
+                <span key={cp.product.id} className="co-purchase-chip">
+                  <ProductArt product={cp.product}/>
+                  <span>{cp.product[lang]}</span>
+                  <small>×{cp.count}</small>
+                </span>
+              ))}
+            </div>
+          </div>}
+
+          <div className="panel-heading" style={{ height: 38, padding: '0 4px', borderBottom: 'none', marginTop: 14 }}>
+            <div className="section-title">
+              <span className="section-number">HIST</span>
+              <h2 style={{ fontSize: 13 }}>{t('itemHistory')} ({itemSales.length})</h2>
+            </div>
+          </div>
+
+          <div className="tx-table-wrap">
+            {itemSales.length ? <table className="tx-table">
+              <thead>
+                <tr>
+                  <th>{t('transaction')}</th>
+                  <th>{t('time')}</th>
+                  <th>{t('customer')}</th>
+                  <th>{t('quantity')}</th>
+                  <th>{t('amount')}</th>
+                  <th>{t('margin')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...itemSales].reverse().map(sale => (
+                  <tr key={sale.receipt.id}>
+                    <td><code>#{receiptNumber(sale.receipt.number)}</code></td>
+                    <td><small>{new Date(sale.time).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short' })} {new Date(sale.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</small></td>
+                    <td>{sale.customerName}</td>
+                    <td><strong>{quantityText(sale.quantity)}</strong> <small>{p.unit}</small></td>
+                    <td>৳ {money(sale.total)}</td>
+                    <td><span className="profit-text">+ ৳ {money(sale.profit)}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table> : <div className="empty-state" style={{ minHeight: 120, padding: 20 }}><p>{t('noItemSales')}</p></div>}
           </div>
 
           <div className="dialog-actions">

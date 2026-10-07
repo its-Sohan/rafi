@@ -77,7 +77,13 @@ export const initialState: ShopState = {
   lines: [{ productId: 'rice', quantity: 2000 }, { productId: 'egg', quantity: 6000 }, { productId: 'milk', quantity: 1000 }],
   discount: 0, customerId: null, receipts: [], customCustomers: [], transactions: [],
 }
-export const allProducts = (custom?: Product[]) => custom && custom.length ? [...products, ...custom] : products
+export const allProducts = (custom?: Product[]) => {
+  if (!custom || !custom.length) return products
+  const customMap = new Map(custom.map(p => [p.id, p]))
+  const baseUpdated = products.map(p => customMap.get(p.id) ?? p)
+  const newlyAdded = custom.filter(p => !products.some(bp => bp.id === p.id))
+  return [...baseUpdated, ...newlyAdded]
+}
 export const allCustomers = (custom?: Customer[]) => custom && custom.length ? [...customers, ...custom] : customers
 export const findCustomerIn = (id: string, list: Customer[]) => list.find(c => c.id === id) ?? customers.find(c => c.id === id)
 export const findProductIn = (id: string, list: Product[]) => list.find(p => p.id === id) ?? products.find(p => p.id === id)!
