@@ -29,6 +29,22 @@ export type AccountTransaction = {
   receiptId?: string
 }
 
+export type Receipt = {
+  id: string
+  number: number
+  createdAt: string
+  lines: (Line & { product: Product })[]
+  customer: Customer | null
+  subtotal: number
+  discount: number
+  total: number
+  paid: number
+  tendered: number
+  change: number
+  due: number
+  method: 'cash' | 'mobile' | 'bank'
+}
+
 export type ShopState = {
   lines: Line[]
   discount: number

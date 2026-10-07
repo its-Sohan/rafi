@@ -111,7 +111,7 @@ test('customer provisioning, balance calculations, dues, loans, and credit adjus
 
   // Sale with due
   const receiptWithDue = {
-    ...makeReceipt({ ...initialState, customerId: newCust.id }, 15000, 'cash'),
+    ...makeReceipt({ ...initialState, customerId: newCust.id, customCustomers: [newCust] }, 15000, 'cash'),
     id: 'r-due-1',
     due: 15600, // 156 BDT due
     customer: newCust,
