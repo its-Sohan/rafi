@@ -96,6 +96,7 @@ export default function App() {
   const [category, setCategory] = useState<Category>('recent')
   const [selected, setSelected] = useState(0)
   const [quantityProduct, setQuantityProduct] = useState<Product | null>(null)
+  const [selectedVariant, setSelectedVariant] = useState<Product | null>(null)
   const [qty, setQty] = useState('1')
   const [inputError, setInputError] = useState('')
   const [dialog, setDialog] = useState<Dialog>(null)
@@ -167,6 +168,22 @@ export default function App() {
   const [newCost, setNewCost] = useState('')
   const [newPurchased, setNewPurchased] = useState('')
 
+  // Multi-variant configuration state
+  type VariantRow = {
+    id: string
+    name: string
+    nameBn: string
+    code: string
+    cost: string
+    price: string
+    stock: string
+  }
+  const [hasVariants, setHasVariants] = useState(false)
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([
+    { id: '1', name: 'Dark', nameBn: 'কালো', code: '', cost: '20.00', price: '25.00', stock: '20' },
+    { id: '2', name: 'Round', nameBn: 'গোল', code: '', cost: '25.00', price: '30.00', stock: '20' },
+  ])
+
   const openProvisionDialog = () => {
     const nextCode = String(100 + catalog.length + 1)
     setNewCode(nextCode)
@@ -178,6 +195,11 @@ export default function App() {
     setNewPrice('')
     setNewCost('')
     setNewPurchased('10')
+    setHasVariants(false)
+    setVariantRows([
+      { id: '1', name: 'Dark', nameBn: 'কালো', code: `${nextCode}D`, cost: '20.00', price: '25.00', stock: '20' },
+      { id: '2', name: 'Round', nameBn: 'গোল', code: `${nextCode}R`, cost: '25.00', price: '30.00', stock: '20' },
+    ])
     setModalError('')
     openDialog('newItem')
   }
@@ -191,6 +213,66 @@ export default function App() {
       setModalError(t('fillRequired'))
       return
     }
+
+    if (hasVariants) {
+      if (!variantRows.length) {
+        setModalError(t('fillRequired'))
+        return
+      }
+
+      const productsToCreate: Product[] = []
+      const groupId = `grp-${Date.now()}-${codeTrim}`
+
+      for (let i = 0; i < variantRows.length; i++) {
+        const row = variantRows[i]
+        const vNameTrim = row.name.trim()
+        if (!vNameTrim) {
+          setModalError(t('fillRequired'))
+          return
+        }
+        const vCode = row.code.trim() || `${codeTrim}-${i + 1}`
+        const vCost = parseMoney(row.cost)
+        const vPrice = parseMoney(row.price)
+        const vStock = parseQuantity(row.stock, newUnit)
+
+        if (vCost === null || vCost <= 0 || vPrice === null || vPrice <= 0) {
+          setModalError(t('invalidAmount'))
+          return
+        }
+        if (vStock === null || vStock <= 0) {
+          setModalError(t('invalidQuantity'))
+          return
+        }
+
+        const vProd: Product = {
+          id: `p-${Date.now()}-${vCode}`,
+          code: vCode,
+          en: enTrim,
+          bn: bnTrim,
+          detail: `${vNameTrim} · ${newUnit}`,
+          detailBn: `${row.nameBn.trim() || vNameTrim} · ${newUnit}`,
+          category: newCategory,
+          unit: newUnit,
+          price: vPrice,
+          cost: vCost,
+          stock: vStock,
+          purchased: vStock,
+          groupId,
+          variantName: vNameTrim,
+          variantNameBn: row.nameBn.trim() || vNameTrim,
+          art: 'rice',
+          color: '#e4e7d8',
+        }
+        productsToCreate.push(vProd)
+      }
+
+      const updatedCustom = [...(state.customProducts ?? []), ...productsToCreate]
+      setState(s => ({ ...s, customProducts: updatedCustom }))
+      closeDialog()
+      setToast({ text: t('itemCreated') })
+      return
+    }
+
     const parsedPrice = parseMoney(newPrice)
     if (parsedPrice === null || parsedPrice <= 0) {
       setModalError(t('invalidAmount'))
@@ -361,6 +443,29 @@ export default function App() {
     setToast({ text: txType === 'payment' ? t('paymentReceived') : txType === 'loan' ? t('loanDisbursed') : t('txSaved') })
   }
 
+  // Helper to retrieve all variants for a product
+  const getVariants = (p: Product): Product[] => {
+    if (!p.groupId) return [p]
+    return catalog.filter(item => item.groupId === p.groupId)
+  }
+
+  // Deduplicate products that belong to the same groupId in the sales catalog view
+  const displayCatalog = (() => {
+    const seenGroups = new Set<string>()
+    const list: Product[] = []
+    for (const p of catalog) {
+      if (p.groupId) {
+        if (!seenGroups.has(p.groupId)) {
+          seenGroups.add(p.groupId)
+          list.push(p)
+        }
+      } else {
+        list.push(p)
+      }
+    }
+    return list
+  })()
+
   // Extract last 10 unique sold items from completed receipts (most recently sold first)
   const recentProducts: Product[] = (() => {
     const seen = new Set<string>()
@@ -370,20 +475,24 @@ export default function App() {
       const receipt = state.receipts[i]
       for (let j = receipt.lines.length - 1; j >= 0; j--) {
         const line = receipt.lines[j]
-        if (!seen.has(line.productId)) {
-          seen.add(line.productId)
-          const found = findItem(line.productId)
-          if (found) list.push(found)
-          if (list.length >= 10) break
+        const found = findItem(line.productId)
+        if (found) {
+          const groupKey = found.groupId ?? found.id
+          if (!seen.has(groupKey)) {
+            seen.add(groupKey)
+            list.push(found)
+            if (list.length >= 10) break
+          }
         }
       }
       if (list.length >= 10) break
     }
-    // If fewer than 10 have been sold, backfill with default catalog items up to 10 so the view is immediately useful
+    // If fewer than 10 have been sold, backfill with default display catalog items up to 10
     if (list.length < 10) {
-      for (const p of catalog) {
-        if (!seen.has(p.id)) {
-          seen.add(p.id)
+      for (const p of displayCatalog) {
+        const groupKey = p.groupId ?? p.id
+        if (!seen.has(groupKey)) {
+          seen.add(groupKey)
           list.push(p)
           if (list.length >= 10) break
         }
@@ -392,7 +501,11 @@ export default function App() {
     return list
   })()
 
-  const filtered = (category === 'recent' ? recentProducts : catalog.filter(p => category === 'all' || p.category === category)).filter(p => `${p.code} ${p.en} ${p.bn} ${p.detail} ${p.detailBn}`.toLowerCase().includes(query.toLowerCase().trim()))
+  const filtered = (category === 'recent' ? recentProducts : displayCatalog.filter(p => category === 'all' || p.category === category)).filter(p => {
+    const variants = getVariants(p)
+    return variants.some(v => `${v.code} ${v.en} ${v.bn} ${v.detail} ${v.detailBn} ${v.variantName ?? ''} ${v.variantNameBn ?? ''}`.toLowerCase().includes(query.toLowerCase().trim()))
+  })
+
   const billSubtotal = subtotal(state.lines, catalog)
   const billTotal = Math.max(0, billSubtotal - state.discount)
   const customer = customerCatalog.find(c => c.id === state.customerId)
@@ -405,7 +518,7 @@ export default function App() {
   const windowProfit = windowReceipts.reduce((s, r) => s + receiptProfit(r), 0)
   const pendingDue = customerCatalog.reduce((sum, c) => sum + customerBalance(c, state.receipts, state.transactions).totalDue, 0)
   const paidAmount = parseMoney(received) ?? 0
-  const goSearch = () => { setQuantityProduct(null); setInputError(''); requestAnimationFrame(() => searchRef.current?.focus()) }
+  const goSearch = () => { setQuantityProduct(null); setSelectedVariant(null); setInputError(''); requestAnimationFrame(() => searchRef.current?.focus()) }
   const closeDialog = () => { if (!busy) { setDialog(null); setModalError('') } }
   const openDialog = (next: Dialog) => { setModalError(''); setDialog(next) }
   const openPayment = () => {
@@ -413,16 +526,24 @@ export default function App() {
     setReceived((billTotal / 100).toFixed(2)); setPaymentMethod('cash'); openDialog('payment')
   }
   const notify = (key: CopyKey) => setToast({ text: t(key) })
-  const chooseProduct = (product: Product) => { setQuantityProduct(product); setQty('1'); setInputError('') }
+  const chooseProduct = (product: Product) => {
+    setQuantityProduct(product)
+    const variants = getVariants(product)
+    setSelectedVariant(variants[0] ?? product)
+    setQty('1')
+    setInputError('')
+    requestAnimationFrame(() => qtyRef.current?.focus())
+  }
   const addProduct = () => {
-    if (!quantityProduct) return
-    const parsed = parseQuantity(qty, quantityProduct.unit)
+    const targetProduct = selectedVariant ?? quantityProduct
+    if (!targetProduct) return
+    const parsed = parseQuantity(qty, targetProduct.unit)
     if (parsed === null) { setInputError(t('invalidQuantity')); return }
-    const existing = state.lines.find(l => l.productId === quantityProduct.id)?.quantity ?? 0
-    if (existing + parsed > stockFor(quantityProduct, state.receipts)) { setInputError(t('noStock')); return }
-    setState(previous => ({ ...previous, lines: previous.lines.some(l => l.productId === quantityProduct.id)
-      ? previous.lines.map(l => l.productId === quantityProduct.id ? { ...l, quantity: l.quantity + parsed } : l)
-      : [...previous.lines, { productId: quantityProduct.id, quantity: parsed }] }))
+    const existing = state.lines.find(l => l.productId === targetProduct.id)?.quantity ?? 0
+    if (existing + parsed > stockFor(targetProduct, state.receipts)) { setInputError(t('noStock')); return }
+    setState(previous => ({ ...previous, lines: previous.lines.some(l => l.productId === targetProduct.id)
+      ? previous.lines.map(l => l.productId === targetProduct.id ? { ...l, quantity: l.quantity + parsed } : l)
+      : [...previous.lines, { productId: targetProduct.id, quantity: parsed }] }))
     notify('productAdded'); setQuery(''); goSearch()
   }
   const removeLine = (index: number) => {
@@ -561,7 +682,67 @@ export default function App() {
               {!filtered.length && <div className="empty-state"><Icon name="search" size={30}/><h3>{t('noResults')}</h3><p>{t('noResultsHint')}</p></div>}
             </div>
             <div className={`quantity-lane ${quantityProduct ? 'active' : ''}`}>
-              {quantityProduct ? <form onSubmit={e => { e.preventDefault(); addProduct() }}><div className="quantity-product-label"><span className="eyebrow">{t('qtyFor')} <code>{quantityProduct.code}</code></span><strong>{quantityProduct[lang]}</strong></div><label className="quantity-field"><span className="sr-only">{t('quantity')}</span><input ref={qtyRef} value={qty} onChange={e => { setQty(e.target.value); setInputError('') }} inputMode="decimal" aria-describedby={inputError ? 'qty-error' : undefined} aria-invalid={!!inputError}/><span>{quantityProduct.unit}</span></label><button className="add-button" type="submit" aria-label={t('addItem')}><Icon name="arrow" size={21}/><kbd>↵</kbd></button></form> : <div className="quantity-placeholder"><Icon name="keyboard" size={18}/><span>{t('itemHint')}</span><kbd>↵</kbd></div>}
+              {quantityProduct ? (() => {
+                const variants = getVariants(quantityProduct)
+                const currentVariant = selectedVariant ?? variants[0] ?? quantityProduct
+                const hasVariants = variants.length > 1
+
+                const handleLaneKeyDown = (e: React.KeyboardEvent) => {
+                  if (hasVariants && (e.key === 'ArrowRight' || e.key === 'ArrowLeft' || e.key === 'ArrowDown' || e.key === 'ArrowUp')) {
+                    e.preventDefault()
+                    const currentIndex = variants.findIndex(v => v.id === currentVariant.id)
+                    const nextIndex = (e.key === 'ArrowRight' || e.key === 'ArrowDown')
+                      ? (currentIndex + 1) % variants.length
+                      : (currentIndex - 1 + variants.length) % variants.length
+                    setSelectedVariant(variants[nextIndex])
+                  }
+                }
+
+                return (
+                  <form onSubmit={e => { e.preventDefault(); addProduct() }} onKeyDown={handleLaneKeyDown}>
+                    <div className="quantity-product-label">
+                      <span className="eyebrow">{t('qtyFor')} <code>{currentVariant.code}</code></span>
+                      <strong>{quantityProduct[lang]}</strong>
+                      {hasVariants && (
+                        <div className="variant-chips" style={{ marginTop: 4 }}>
+                          {variants.map(v => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              className={`variant-chip-btn ${v.id === currentVariant.id ? 'active' : ''}`}
+                              onClick={() => { setSelectedVariant(v); qtyRef.current?.focus() }}
+                              title={`${v.en}: ৳ ${money(v.price)}`}
+                            >
+                              <span>{lang === 'bn' ? (v.variantNameBn ?? v.variantName ?? v.detailBn) : (v.variantName ?? v.detail)}</span>
+                              <small>৳ {money(v.price)}</small>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    {hasVariants && (
+                      <div className="variant-nav-hint" title="Use arrow keys to change variant">
+                        <kbd>←</kbd><kbd>→</kbd><span>{t('variants')}</span>
+                      </div>
+                    )}
+                    <label className="quantity-field">
+                      <span className="sr-only">{t('quantity')}</span>
+                      <input
+                        ref={qtyRef}
+                        value={qty}
+                        onChange={e => { setQty(e.target.value); setInputError('') }}
+                        inputMode="decimal"
+                        aria-describedby={inputError ? 'qty-error' : undefined}
+                        aria-invalid={!!inputError}
+                      />
+                      <span>{currentVariant.unit}</span>
+                    </label>
+                    <button className="add-button" type="submit" aria-label={t('addItem')}>
+                      <Icon name="arrow" size={21}/><kbd>↵</kbd>
+                    </button>
+                  </form>
+                )
+              })() : <div className="quantity-placeholder"><Icon name="keyboard" size={18}/><span>{t('itemHint')}</span><kbd>↵</kbd></div>}
               {inputError && <p id="qty-error" className="field-error" role="alert">{inputError}</p>}
             </div>
             <div className="catalog-footnote"><span className="pixel-dot"/>{t('noBackend')}</div>
@@ -659,8 +840,9 @@ export default function App() {
                 <td><button className="icon-button" aria-label={`${t('viewProfile')}: ${c[lang]}`} onClick={() => openCustomerProfile(c)}><Icon name="chevron" size={16}/></button></td>
               </tr>
             })}</tbody></table></div> : reportsSubView === 'products' ? (() => {
-              // Calculate per-item performance within selected window
-              const productStatsList = catalog.map(p => {
+              // Calculate per-item performance within selected window, aggregating grouped variants
+              const productStatsList = displayCatalog.map(parentProduct => {
+                const variants = getVariants(parentProduct)
                 let units = 0
                 let revenue = 0
                 let profit = 0
@@ -669,7 +851,7 @@ export default function App() {
                 for (const r of windowReceipts) {
                   let foundInReceipt = false
                   for (const line of r.lines) {
-                    if (line.productId === p.id) {
+                    if (variants.some(v => v.id === line.productId)) {
                       foundInReceipt = true
                       units += line.quantity
                       revenue += lineTotal(line.product.price, line.quantity)
@@ -680,7 +862,8 @@ export default function App() {
                 }
 
                 return {
-                  product: p,
+                  product: parentProduct,
+                  variants,
                   units,
                   revenue,
                   profit,
@@ -703,9 +886,10 @@ export default function App() {
                     </tr>
                   </thead>
                   <tbody>
-                    {productStatsList.map(({ product: p, units, revenue, profit, orderCount }) => {
+                    {productStatsList.map(({ product: p, variants, units, revenue, profit, orderCount }) => {
                       const m = unitMargin(p)
                       const mPct = unitMarginPercent(p)
+                      const hasVariants = variants.length > 1
                       return (
                         <tr key={p.id} className="clickable-row" onClick={() => { setActiveReportProduct(p); openDialog('itemStats') }}>
                           <td>
@@ -713,7 +897,11 @@ export default function App() {
                               <ProductArt product={p}/>
                               <span>
                                 <strong>{p[lang]}</strong>
-                                <small>{lang === 'en' ? p.detail : p.detailBn}</small>
+                                <small>
+                                  {hasVariants
+                                    ? `${variants.length} ${t('variants')}`
+                                    : (lang === 'en' ? p.detail : p.detailBn)}
+                                </small>
                               </span>
                             </div>
                           </td>
@@ -721,7 +909,11 @@ export default function App() {
                           <td><strong>{quantityText(units)}</strong> <small>{p.unit}</small></td>
                           <td>৳ {money(revenue)}</td>
                           <td><span className="profit-text">৳ {money(profit)}</span></td>
-                          <td><span className="margin-badge">৳ {money(m)} ({mPct.toFixed(0)}%)</span></td>
+                          <td>
+                            <span className="margin-badge">
+                              {hasVariants ? `~${mPct.toFixed(0)}%` : `৳ ${money(m)} (${mPct.toFixed(0)}%)`}
+                            </span>
+                          </td>
                           <td>{orderCount}</td>
                           <td>
                             <button className="icon-button" aria-label={`${t('viewItemStats')}: ${p[lang]}`} onClick={e => { e.stopPropagation(); setActiveReportProduct(p); openDialog('itemStats') }}>
@@ -763,9 +955,25 @@ export default function App() {
       {dialog === 'settings' && <><div className="eyebrow modal-eyebrow">HISAB / PREFERENCES</div><h3>{t('settings')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('settingsHint')}</p><div className="setting-row"><span>{t('language')}</span><div className="setting-language"><button onClick={() => setLang('en')} className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'}>English</button><button onClick={() => setLang('bn')} className={lang === 'bn' ? 'active' : ''} aria-pressed={lang === 'bn'}>বাংলা</button></div></div><div className="setting-row"><span>{t('appearance')}</span><div className="setting-language"><button onClick={() => setTheme('light')} className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'}>{t('light')}</button><button onClick={() => setTheme('dark')} className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'}>{t('dark')}</button></div></div><div className="setting-row"><span>{t('offlineAccess')}</span><span className={`offline-status ${offlineStatus}`} role="status">{t(offlineStatus === 'ready' ? 'offlineReady' : offlineStatus === 'preparing' ? 'offlinePreparing' : offlineStatus === 'development' ? 'offlineDevelopment' : 'offlineUnavailable')}</span></div><div className="storage-setting"><h4>{t('storage')}</h4><p>{t('storageHint')}</p><button className="secondary-button" onClick={exportBackup}><Icon name="download" size={16}/>{t('export')}</button></div><p className="dialog-note">{t('version')}</p></>}
 
       {dialog === 'newItem' && <form onSubmit={e => { e.preventDefault(); createProduct() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('inventory')}</div><h3>{t('newItem')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newItemHint')}</p>
+        <div className="variant-toggle-row">
+          <label htmlFor="toggle-has-variants">
+            <input
+              id="toggle-has-variants"
+              type="checkbox"
+              checked={hasVariants}
+              onChange={e => {
+                setHasVariants(e.target.checked)
+                setModalError('')
+              }}
+            />
+            <span>{t('hasVariantsShort')}</span>
+          </label>
+          <small style={{ color: 'var(--muted)', fontSize: 10 }}>{t('hasVariantsToggle')}</small>
+        </div>
+
         <div className="form-grid">
           <div className="form-group">
-            <label htmlFor="item-code">{t('code')} *</label>
+            <label htmlFor="item-code">{hasVariants ? `${t('code')} (${t('product')})` : t('code')} *</label>
             <input id="item-code" className="form-input" value={newCode} onChange={e => {
               const val = e.target.value
               setNewCode(val)
@@ -792,16 +1000,18 @@ export default function App() {
           </div>
           <div className="form-group span-2">
             <label htmlFor="item-name-en">{t('productNameEn')} *</label>
-            <input id="item-name-en" className="form-input" value={newNameEn} onChange={e => { setNewNameEn(e.target.value); setModalError('') }} placeholder="e.g. Mustard oil" required/>
+            <input id="item-name-en" className="form-input" value={newNameEn} onChange={e => { setNewNameEn(e.target.value); setModalError('') }} placeholder="e.g. Eggplant (বেগুন)" required/>
           </div>
           <div className="form-group span-2">
             <label htmlFor="item-name-bn">{t('productNameBn')}</label>
-            <input id="item-name-bn" className="form-input" value={newNameBn} onChange={e => setNewNameBn(e.target.value)} placeholder="e.g. সরিষার তেল"/>
+            <input id="item-name-bn" className="form-input" value={newNameBn} onChange={e => setNewNameBn(e.target.value)} placeholder="e.g. বেগুন"/>
           </div>
-          <div className="form-group span-2">
-            <label htmlFor="item-detail">{t('productDetail')}</label>
-            <input id="item-detail" className="form-input" value={newDetail} onChange={e => setNewDetail(e.target.value)} placeholder="e.g. Radhuni · 500 ml"/>
-          </div>
+          {!hasVariants && (
+            <div className="form-group span-2">
+              <label htmlFor="item-detail">{t('productDetail')}</label>
+              <input id="item-detail" className="form-input" value={newDetail} onChange={e => setNewDetail(e.target.value)} placeholder="e.g. Fresh · loose"/>
+            </div>
+          )}
           <div className="form-group">
             <label htmlFor="item-unit">{t('unitLabel')}</label>
             <select id="item-unit" className="form-input" value={newUnit} onChange={e => setNewUnit(e.target.value as Product['unit'])}>
@@ -810,21 +1020,114 @@ export default function App() {
               <option value="L">L (Litre)</option>
             </select>
           </div>
-          <div className="form-group">
-            <label htmlFor="item-purchased">{t('purchasedQty')} ({newUnit}) *</label>
-            <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
-          </div>
-          <div className="form-group">
-            <label htmlFor="item-cost">{t('costPrice')} (৳) *</label>
-            <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 150.00" required/>
-          </div>
-          <div className="form-group">
-            <label htmlFor="item-price">{t('sellingPrice')} (৳) *</label>
-            <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder="e.g. 175.00" required/>
-          </div>
+          {!hasVariants && (
+            <>
+              <div className="form-group">
+                <label htmlFor="item-purchased">{t('purchasedQty')} ({newUnit}) *</label>
+                <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
+              </div>
+              <div className="form-group">
+                <label htmlFor="item-cost">{t('costPrice')} (৳) *</label>
+                <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 20.00" required/>
+              </div>
+              <div className="form-group">
+                <label htmlFor="item-price">{t('sellingPrice')} (৳) *</label>
+                <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder="e.g. 25.00" required/>
+              </div>
+            </>
+          )}
         </div>
 
-        {(() => {
+        {hasVariants && (
+          <div className="variant-builder-wrap">
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+              <span className="eyebrow">{t('variantBreakdown')} ({variantRows.length})</span>
+              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Configure individual cost, price, and stock for each variant</small>
+            </div>
+            {variantRows.map((vRow, idx) => (
+              <div key={vRow.id} className="variant-builder-row">
+                <input
+                  placeholder="Variant (e.g. Dark, Round)"
+                  value={vRow.name}
+                  onChange={e => {
+                    const next = [...variantRows]
+                    next[idx] = { ...next[idx], name: e.target.value }
+                    setVariantRows(next)
+                  }}
+                  required
+                />
+                <input
+                  placeholder="Code (optional)"
+                  value={vRow.code}
+                  onChange={e => {
+                    const next = [...variantRows]
+                    next[idx] = { ...next[idx], code: e.target.value }
+                    setVariantRows(next)
+                  }}
+                />
+                <input
+                  placeholder="Cost ৳"
+                  inputMode="decimal"
+                  value={vRow.cost}
+                  onChange={e => {
+                    const next = [...variantRows]
+                    next[idx] = { ...next[idx], cost: e.target.value }
+                    setVariantRows(next)
+                  }}
+                  required
+                />
+                <input
+                  placeholder="Price ৳"
+                  inputMode="decimal"
+                  value={vRow.price}
+                  onChange={e => {
+                    const next = [...variantRows]
+                    next[idx] = { ...next[idx], price: e.target.value }
+                    setVariantRows(next)
+                  }}
+                  required
+                />
+                <input
+                  placeholder={`Stock (${newUnit})`}
+                  inputMode="decimal"
+                  value={vRow.stock}
+                  onChange={e => {
+                    const next = [...variantRows]
+                    next[idx] = { ...next[idx], stock: e.target.value }
+                    setVariantRows(next)
+                  }}
+                  required
+                />
+                {variantRows.length > 1 ? (
+                  <button
+                    type="button"
+                    className="remove-variant-btn"
+                    onClick={() => setVariantRows(variantRows.filter((_, i) => i !== idx))}
+                    title={t('removeVariantRow')}
+                  >
+                    <Icon name="close" size={12}/>
+                  </button>
+                ) : <div/>}
+              </div>
+            ))}
+            <button
+              type="button"
+              className="add-variant-btn"
+              onClick={() => {
+                const nextId = String(Date.now())
+                const defaultLabel = variantRows.length === 0 ? 'Dark' : variantRows.length === 1 ? 'Round' : `Variant ${variantRows.length + 1}`
+                setVariantRows([
+                  ...variantRows,
+                  { id: nextId, name: defaultLabel, nameBn: defaultLabel, code: `${newCode}-${variantRows.length + 1}`, cost: '20.00', price: '25.00', stock: '20' }
+                ])
+              }}
+            >
+              {t('addVariantRow')}
+            </button>
+          </div>
+        )}
+
+        {!hasVariants && (() => {
           const existingItem = catalog.find(p => p.code.toLowerCase() === newCode.trim().toLowerCase())
           const c = parseMoney(newCost)
           const p = parseMoney(newPrice)
@@ -992,13 +1295,16 @@ export default function App() {
 
       {dialog === 'itemStats' && activeReportProduct && (() => {
         const p = activeReportProduct
+        const variants = getVariants(p)
+        const hasVariants = variants.length > 1
         const cost = productCost(p)
         const margin = unitMargin(p)
         const marginPct = unitMarginPercent(p)
 
-        // Find all receipts containing this product in the selected window
+        // Find all receipts containing any variant of this product in the selected window
         type ItemSaleRecord = {
           receipt: Receipt
+          product: Product
           quantity: number
           total: number
           profit: number
@@ -1012,30 +1318,45 @@ export default function App() {
         let totalRevenue = 0
         let totalProfit = 0
 
+        // Per-variant breakdown map
+        const variantStatsMap = new Map<string, { product: Product; units: number; revenue: number; profit: number }>()
+        for (const v of variants) {
+          variantStatsMap.set(v.id, { product: v, units: 0, revenue: 0, profit: 0 })
+        }
+
         for (const r of windowReceipts) {
-          const matchingLines = r.lines.filter(l => l.productId === p.id)
+          const matchingLines = r.lines.filter(l => variants.some(v => v.id === l.productId))
           if (!matchingLines.length) continue
 
-          const lineQty = matchingLines.reduce((sum, l) => sum + l.quantity, 0)
-          const lineRev = matchingLines.reduce((sum, l) => sum + lineTotal(l.product.price, l.quantity), 0)
-          const lineProf = matchingLines.reduce((sum, l) => sum + lineProfit(l.product, l.quantity), 0)
+          for (const line of matchingLines) {
+            const lineRev = lineTotal(line.product.price, line.quantity)
+            const lineProf = lineProfit(line.product, line.quantity)
 
-          totalSoldUnits += lineQty
-          totalRevenue += lineRev
-          totalProfit += lineProf
+            totalSoldUnits += line.quantity
+            totalRevenue += lineRev
+            totalProfit += lineProf
 
-          itemSales.push({
-            receipt: r,
-            quantity: lineQty,
-            total: lineRev,
-            profit: lineProf,
-            time: r.createdAt,
-            customerName: r.customer ? r.customer[lang] : t('walkIn'),
-          })
+            const vStats = variantStatsMap.get(line.productId)
+            if (vStats) {
+              vStats.units += line.quantity
+              vStats.revenue += lineRev
+              vStats.profit += lineProf
+            }
 
-          // Track frequently bought with
+            itemSales.push({
+              receipt: r,
+              product: line.product,
+              quantity: line.quantity,
+              total: lineRev,
+              profit: lineProf,
+              time: r.createdAt,
+              customerName: r.customer ? r.customer[lang] : t('walkIn'),
+            })
+          }
+
+          // Track frequently bought with (exclude any lines from this product's variant family)
           for (const otherLine of r.lines) {
-            if (otherLine.productId !== p.id) {
+            if (!variants.some(v => v.id === otherLine.productId)) {
               const cur = coPurchaseMap.get(otherLine.productId) ?? { product: otherLine.product, count: 0 }
               cur.count += 1
               coPurchaseMap.set(otherLine.productId, cur)
@@ -1047,13 +1368,18 @@ export default function App() {
           .sort((a, b) => b.count - a.count)
           .slice(0, 4)
 
+        const totalStock = variants.reduce((sum, v) => sum + stockFor(v, state.receipts), 0)
+
         return <>
           <div className="eyebrow modal-eyebrow">{t('reports')}<span> / </span>{t('itemOverview')}</div>
           <div className="customer-profile-header">
             <div className="item-profile-art"><ProductArt product={p}/></div>
             <div className="customer-profile-info">
               <h3>{p[lang]}<span className="heading-dot">.</span></h3>
-              <p><code>{p.code}</code> · {lang === 'en' ? p.detail : p.detailBn} · ৳ {money(p.price)} / {p.unit}</p>
+              <p>
+                <code>{p.code}</code> · {hasVariants ? `${variants.length} ${t('variants')}` : (lang === 'en' ? p.detail : p.detailBn)}
+                {!hasVariants && ` · ৳ ${money(p.price)} / ${p.unit}`}
+              </p>
             </div>
           </div>
 
@@ -1072,24 +1398,70 @@ export default function App() {
             </div>
           </div>
 
-          <div className="item-detail-cards-grid">
-            <div className="item-detail-subcard">
-              <span className="eyebrow">{t('cost')}</span>
-              <strong>৳ {money(cost)} / {p.unit}</strong>
+          {!hasVariants ? (
+            <div className="item-detail-cards-grid">
+              <div className="item-detail-subcard">
+                <span className="eyebrow">{t('cost')}</span>
+                <strong>৳ {money(cost)} / {p.unit}</strong>
+              </div>
+              <div className="item-detail-subcard">
+                <span className="eyebrow">{t('sellingPrice')}</span>
+                <strong>৳ {money(p.price)} / {p.unit}</strong>
+              </div>
+              <div className="item-detail-subcard">
+                <span className="eyebrow">{t('unitMargin')}</span>
+                <strong style={{ color: '#2e6b36' }}>৳ {money(margin)} ({marginPct.toFixed(0)}%)</strong>
+              </div>
+              <div className="item-detail-subcard">
+                <span className="eyebrow">{t('stock')}</span>
+                <strong>{quantityText(stockFor(p, state.receipts))} {p.unit}</strong>
+              </div>
             </div>
-            <div className="item-detail-subcard">
-              <span className="eyebrow">{t('sellingPrice')}</span>
-              <strong>৳ {money(p.price)} / {p.unit}</strong>
+          ) : (
+            <div className="variant-table-wrap">
+              <div className="panel-heading" style={{ height: 32, padding: '0 12px', borderBottom: 'none' }}>
+                <div className="section-title">
+                  <span className="section-number">VAR</span>
+                  <h2 style={{ fontSize: 11 }}>{t('variantBreakdown')}</h2>
+                </div>
+              </div>
+              <table className="variant-table">
+                <thead>
+                  <tr>
+                    <th>{t('variant')}</th>
+                    <th>{t('cost')}</th>
+                    <th>{t('price')}</th>
+                    <th>{t('stock')}</th>
+                    <th>{t('unitsSold')}</th>
+                    <th>{t('itemRevenue')}</th>
+                    <th>{t('itemProfit')}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {variants.map(v => {
+                    const vStat = variantStatsMap.get(v.id)
+                    const vCost = productCost(v)
+                    const vMargin = unitMargin(v)
+                    const vMarginPct = unitMarginPercent(v)
+                    return (
+                      <tr key={v.id}>
+                        <td>
+                          <strong>{lang === 'bn' ? (v.variantNameBn ?? v.variantName ?? v.detailBn) : (v.variantName ?? v.detail)}</strong>
+                          <br/><small style={{ color: 'var(--muted)', fontFamily: 'var(--mono)' }}>{v.code}</small>
+                        </td>
+                        <td>৳ {money(vCost)}</td>
+                        <td>৳ {money(v.price)}</td>
+                        <td>{quantityText(stockFor(v, state.receipts))} <small>{v.unit}</small></td>
+                        <td><strong>{quantityText(vStat?.units ?? 0)}</strong> <small>{v.unit}</small></td>
+                        <td>৳ {money(vStat?.revenue ?? 0)}</td>
+                        <td><span className="profit-text">+৳ {money(vStat?.profit ?? 0)}</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-            <div className="item-detail-subcard">
-              <span className="eyebrow">{t('unitMargin')}</span>
-              <strong style={{ color: '#2e6b36' }}>৳ {money(margin)} ({marginPct.toFixed(0)}%)</strong>
-            </div>
-            <div className="item-detail-subcard">
-              <span className="eyebrow">{t('stock')}</span>
-              <strong>{quantityText(stockFor(p, state.receipts))} {p.unit}</strong>
-            </div>
-          </div>
+          )}
 
           {topCoPurchases.length > 0 && <div className="co-purchase-section">
             <span className="eyebrow" style={{ marginBottom: 8 }}>{t('frequencyBought')}</span>
@@ -1118,6 +1490,7 @@ export default function App() {
                   <th>{t('transaction')}</th>
                   <th>{t('time')}</th>
                   <th>{t('customer')}</th>
+                  {hasVariants && <th>{t('variant')}</th>}
                   <th>{t('quantity')}</th>
                   <th>{t('amount')}</th>
                   <th>{t('margin')}</th>
@@ -1125,11 +1498,12 @@ export default function App() {
               </thead>
               <tbody>
                 {[...itemSales].reverse().map(sale => (
-                  <tr key={sale.receipt.id}>
+                  <tr key={`${sale.receipt.id}-${sale.product.id}`}>
                     <td><code>#{receiptNumber(sale.receipt.number)}</code></td>
                     <td><small>{new Date(sale.time).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short' })} {new Date(sale.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</small></td>
                     <td>{sale.customerName}</td>
-                    <td><strong>{quantityText(sale.quantity)}</strong> <small>{p.unit}</small></td>
+                    {hasVariants && <td><small>{lang === 'bn' ? (sale.product.variantNameBn ?? sale.product.variantName ?? sale.product.detailBn) : (sale.product.variantName ?? sale.product.detail)}</small></td>}
+                    <td><strong>{quantityText(sale.quantity)}</strong> <small>{sale.product.unit}</small></td>
                     <td>৳ {money(sale.total)}</td>
                     <td><span className="profit-text">+ ৳ {money(sale.profit)}</span></td>
                   </tr>

@@ -5,6 +5,9 @@ export type Product = {
   category: Exclude<Category, 'all' | 'recent'>; unit: 'kg' | 'pc' | 'L'; price: number; stock: number
   cost?: number // Wholesale / purchase cost per unit in poisha (minor currency unit: 1 BDT = 100 poisha)
   purchased?: number // Total units purchased / provisioned (scaled integer: 1 unit = 1000)
+  groupId?: string // Identifier linking variants of the same product (e.g. 'egg', 'soap')
+  variantName?: string // Short variant name for inline picker e.g. 'Brown' / 'White'
+  variantNameBn?: string // Bengali variant name e.g. 'লাল' / 'সাদা'
   art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner'
   color: string
 }
@@ -57,7 +60,8 @@ export type ShopState = {
 export const products: Product[] = [
   { id: 'rice', code: '101', en: 'Miniket rice', bn: 'মিনিকেট চাল', detail: 'Premium · loose', detailBn: 'প্রিমিয়াম · খোলা', category: 'staples', unit: 'kg', price: 7200, cost: 6200, stock: 125000, purchased: 125000, art: 'rice', color: '#e8e4d8' },
   { id: 'oil', code: '102', en: 'Soybean oil', bn: 'সয়াবিন তেল', detail: 'Fresh · 1 litre', detailBn: 'ফ্রেশ · ১ লিটার', category: 'staples', unit: 'pc', price: 18000, cost: 16200, stock: 48000, purchased: 48000, art: 'oil', color: '#f4e8b9' },
-  { id: 'egg', code: '103', en: 'Farm eggs', bn: 'ফার্মের ডিম', detail: 'Brown · regular', detailBn: 'লাল · সাধারণ', category: 'fresh', unit: 'pc', price: 1200, cost: 1000, stock: 180000, purchased: 180000, art: 'egg', color: '#f2dfce' },
+  { id: 'egg', code: '103', en: 'Farm eggs', bn: 'ফার্মের ডিম', detail: 'Brown · regular', detailBn: 'লাল · সাধারণ', category: 'fresh', unit: 'pc', price: 1200, cost: 1000, stock: 180000, purchased: 180000, groupId: 'egg', variantName: 'Brown', variantNameBn: 'লাল ডিম', art: 'egg', color: '#f2dfce' },
+  { id: 'egg-white', code: '103W', en: 'Farm eggs', bn: 'ফার্মের ডিম', detail: 'White · regular', detailBn: 'সাদা · সাধারণ', category: 'fresh', unit: 'pc', price: 1100, cost: 950, stock: 120000, purchased: 120000, groupId: 'egg', variantName: 'White', variantNameBn: 'সাদা ডিম', art: 'egg', color: '#fffdfa' },
   { id: 'milk', code: '104', en: 'Full cream milk', bn: 'ফুল ক্রিম দুধ', detail: 'Milk Vita · 1 litre', detailBn: 'মিল্ক ভিটা · ১ লিটার', category: 'fresh', unit: 'pc', price: 9000, cost: 8000, stock: 24000, purchased: 24000, art: 'milk', color: '#e0e8f0' },
   { id: 'sugar', code: '105', en: 'White sugar', bn: 'সাদা চিনি', detail: 'Refined · loose', detailBn: 'পরিশোধিত · খোলা', category: 'staples', unit: 'kg', price: 13500, cost: 12000, stock: 65000, purchased: 65000, art: 'sugar', color: '#e6e5ee' },
   { id: 'tea', code: '106', en: 'Black tea', bn: 'কালো চা', detail: 'Ispahani · 200 g', detailBn: 'ইস্পাহানি · ২০০ গ্রাম', category: 'staples', unit: 'pc', price: 11000, cost: 9500, stock: 32000, purchased: 32000, art: 'tea', color: '#dee9d8' },
