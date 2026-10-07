@@ -1,12 +1,42 @@
 import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
 import { Icon, PixelMark, ProductArt } from './Icons'
-import { customers, findProduct, initialState, lineTotal, makeReceipt, money, parseMoney, parseQuantity, products, quantityText, stockFor, subtotal, type Category, type Lang, type Line, type Product, type Receipt, type ShopState } from './model'
+import {
+  allProducts,
+  allCustomers,
+  customers,
+  customerBalance,
+  customerLedger,
+  findProductIn,
+  initialState,
+  lineTotal,
+  makeReceipt,
+  money,
+  parseMoney,
+  parseQuantity,
+  productCost,
+  products,
+  quantityText,
+  stockFor,
+  subtotal,
+  filterReceiptsByWindow,
+  unitMargin,
+  unitMarginPercent,
+  type Category,
+  type Customer,
+  type AccountTransaction,
+  type Lang,
+  type Line,
+  type Product,
+  type Receipt,
+  type ReportWindow,
+  type ShopState,
+} from './model'
 import { downloadJson, loadState, saveState } from './storage'
 import { translator, type CopyKey } from './i18n'
 import type { OfflineStatus } from './offline'
 
 type View = 'sales' | 'inventory' | 'accounts' | 'reports'
-type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | null
+type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | null
 const receiptNumber = (n: number) => String(n).padStart(4, '0')
 const dayKey = (date: string | Date) => new Date(date).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
 
@@ -61,7 +91,7 @@ export default function App() {
   const [online, setOnline] = useState(navigator.onLine)
   const [offlineStatus, setOfflineStatus] = useState<OfflineStatus>(() => document.documentElement.dataset.offline as OfflineStatus ?? 'preparing')
   const [query, setQuery] = useState('')
-  const [category, setCategory] = useState<Category>('all')
+  const [category, setCategory] = useState<Category>('recent')
   const [selected, setSelected] = useState(0)
   const [quantityProduct, setQuantityProduct] = useState<Product | null>(null)
   const [qty, setQty] = useState('1')
@@ -75,6 +105,7 @@ export default function App() {
   const [busy, setBusy] = useState(false)
   const [activeReceipt, setActiveReceipt] = useState<Receipt | null>(null)
   const [justCompleted, setJustCompleted] = useState(false)
+  const [reportWindow, setReportWindow] = useState<ReportWindow>('today')
   const [billSelection, setBillSelection] = useState(0)
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null)
   const searchRef = useRef<HTMLInputElement>(null)
@@ -115,14 +146,224 @@ export default function App() {
   useEffect(() => { if (quantityProduct) { qtyRef.current?.focus(); qtyRef.current?.select() } }, [quantityProduct])
   useEffect(() => { if (ready) searchRef.current?.focus() }, [ready, view])
 
-  const filtered = products.filter(p => (category === 'all' || p.category === category) && `${p.code} ${p.en} ${p.bn} ${p.detail} ${p.detailBn}`.toLowerCase().includes(query.toLowerCase().trim()))
-  const billSubtotal = subtotal(state.lines)
+  const [customProducts, setCustomProducts] = useState<Product[]>(() => state.customProducts ?? [])
+  useEffect(() => {
+    if (state.customProducts) setCustomProducts(state.customProducts)
+  }, [state.customProducts])
+
+  const catalog = allProducts(state.customProducts ?? customProducts)
+  const findItem = (id: string) => findProductIn(id, catalog)
+
+  // Provisioning form state
+  const [newCode, setNewCode] = useState('')
+  const [newNameEn, setNewNameEn] = useState('')
+  const [newNameBn, setNewNameBn] = useState('')
+  const [newDetail, setNewDetail] = useState('')
+  const [newCategory, setNewCategory] = useState<Exclude<Category, 'all' | 'recent'>>('staples')
+  const [newUnit, setNewUnit] = useState<Product['unit']>('kg')
+  const [newPrice, setNewPrice] = useState('')
+  const [newCost, setNewCost] = useState('')
+  const [newPurchased, setNewPurchased] = useState('')
+
+  const openProvisionDialog = () => {
+    const nextCode = String(100 + catalog.length + 1)
+    setNewCode(nextCode)
+    setNewNameEn('')
+    setNewNameBn('')
+    setNewDetail('')
+    setNewCategory('staples')
+    setNewUnit('kg')
+    setNewPrice('')
+    setNewCost('')
+    setNewPurchased('10')
+    setModalError('')
+    openDialog('newItem')
+  }
+
+  const createProduct = () => {
+    const codeTrim = newCode.trim()
+    const enTrim = newNameEn.trim()
+    const bnTrim = newNameBn.trim() || enTrim
+    const detailTrim = newDetail.trim() || `${newCategory} · loose`
+    if (!codeTrim || !enTrim) {
+      setModalError(t('fillRequired'))
+      return
+    }
+    if (catalog.some(p => p.code.toLowerCase() === codeTrim.toLowerCase())) {
+      setModalError(t('codeExists'))
+      return
+    }
+    const parsedPrice = parseMoney(newPrice)
+    if (parsedPrice === null || parsedPrice <= 0) {
+      setModalError(t('invalidAmount'))
+      return
+    }
+    const parsedCost = parseMoney(newCost)
+    if (parsedCost === null || parsedCost <= 0) {
+      setModalError(t('invalidAmount'))
+      return
+    }
+    const parsedPurchased = parseQuantity(newPurchased, newUnit)
+    if (parsedPurchased === null || parsedPurchased <= 0) {
+      setModalError(t('invalidQuantity'))
+      return
+    }
+
+    const newProd: Product = {
+      id: `p-${Date.now()}-${codeTrim}`,
+      code: codeTrim,
+      en: enTrim,
+      bn: bnTrim,
+      detail: detailTrim,
+      detailBn: detailTrim,
+      category: newCategory,
+      unit: newUnit,
+      price: parsedPrice,
+      cost: parsedCost,
+      stock: parsedPurchased,
+      purchased: parsedPurchased,
+      art: 'rice',
+      color: '#e4e7d8',
+    }
+
+    const updatedCustom = [...(state.customProducts ?? []), newProd]
+    setState(s => ({ ...s, customProducts: updatedCustom }))
+    closeDialog()
+    setToast({ text: t('itemCreated') })
+  }
+
+  // Customer provisioning and profile state
+  const customerCatalog = allCustomers(state.customCustomers)
+  const [newCustEn, setNewCustEn] = useState('')
+  const [newCustBn, setNewCustBn] = useState('')
+  const [newCustPhone, setNewCustPhone] = useState('')
+  const [newCustCreditLimit, setNewCustCreditLimit] = useState('5000')
+  const [newCustOpeningDue, setNewCustOpeningDue] = useState('0')
+  const [activeCustomer, setActiveCustomer] = useState<Customer | null>(null)
+
+  // Transaction record modal state
+  const [txType, setTxType] = useState<AccountTransaction['type']>('payment')
+  const [txAmount, setTxAmount] = useState('')
+  const [txNote, setTxNote] = useState('')
+
+  const openCustomerProvisionDialog = () => {
+    setNewCustEn('')
+    setNewCustBn('')
+    setNewCustPhone('')
+    setNewCustCreditLimit('5000')
+    setNewCustOpeningDue('0')
+    setModalError('')
+    openDialog('newCustomer')
+  }
+
+  const createCustomer = () => {
+    const enTrim = newCustEn.trim()
+    const bnTrim = newCustBn.trim() || enTrim
+    const phoneTrim = newCustPhone.trim()
+    if (!enTrim || !phoneTrim) {
+      setModalError(t('fillRequired'))
+      return
+    }
+    if (customerCatalog.some(c => c.phone.replaceAll(' ', '') === phoneTrim.replaceAll(' ', ''))) {
+      setModalError(t('phoneExists'))
+      return
+    }
+    const parsedCreditLimit = parseMoney(newCustCreditLimit) ?? 500000
+    const parsedOpeningDue = parseMoney(newCustOpeningDue) ?? 0
+
+    const newCust: Customer = {
+      id: `c-${Date.now()}`,
+      en: enTrim,
+      bn: bnTrim,
+      phone: phoneTrim,
+      creditLimit: parsedCreditLimit,
+      openingBalance: parsedOpeningDue,
+    }
+
+    const updated = [...(state.customCustomers ?? []), newCust]
+    setState(s => ({ ...s, customCustomers: updated }))
+    closeDialog()
+    setToast({ text: t('customerCreated') })
+  }
+
+  const openCustomerProfile = (c: Customer) => {
+    setActiveCustomer(c)
+    openDialog('customerProfile')
+  }
+
+  const openAddTransaction = (type: AccountTransaction['type']) => {
+    setTxType(type)
+    setTxAmount('')
+    setTxNote('')
+    setModalError('')
+    openDialog('addTx')
+  }
+
+  const recordTransaction = () => {
+    if (!activeCustomer) return
+    const parsed = parseMoney(txAmount)
+    if (parsed === null || parsed <= 0) {
+      setModalError(t('invalidAmount'))
+      return
+    }
+
+    const newTx: AccountTransaction = {
+      id: `tx-${Date.now()}`,
+      customerId: activeCustomer.id,
+      type: txType,
+      amount: parsed,
+      createdAt: new Date().toISOString(),
+      note: txNote.trim() || (txType === 'payment' ? t('txPayment') : txType === 'loan' ? t('txLoan') : t('txAdjustment')),
+    }
+
+    const updated = [...(state.transactions ?? []), newTx]
+    setState(s => ({ ...s, transactions: updated }))
+    closeDialog()
+    setToast({ text: txType === 'payment' ? t('paymentReceived') : txType === 'loan' ? t('loanDisbursed') : t('txSaved') })
+  }
+
+  // Extract last 10 unique sold items from completed receipts (most recently sold first)
+  const recentProducts: Product[] = (() => {
+    const seen = new Set<string>()
+    const list: Product[] = []
+    // Iterate from newest receipt to oldest
+    for (let i = state.receipts.length - 1; i >= 0; i--) {
+      const receipt = state.receipts[i]
+      for (let j = receipt.lines.length - 1; j >= 0; j--) {
+        const line = receipt.lines[j]
+        if (!seen.has(line.productId)) {
+          seen.add(line.productId)
+          const found = findItem(line.productId)
+          if (found) list.push(found)
+          if (list.length >= 10) break
+        }
+      }
+      if (list.length >= 10) break
+    }
+    // If fewer than 10 have been sold, backfill with default catalog items up to 10 so the view is immediately useful
+    if (list.length < 10) {
+      for (const p of catalog) {
+        if (!seen.has(p.id)) {
+          seen.add(p.id)
+          list.push(p)
+          if (list.length >= 10) break
+        }
+      }
+    }
+    return list
+  })()
+
+  const filtered = (category === 'recent' ? recentProducts : catalog.filter(p => category === 'all' || p.category === category)).filter(p => `${p.code} ${p.en} ${p.bn} ${p.detail} ${p.detailBn}`.toLowerCase().includes(query.toLowerCase().trim()))
+  const billSubtotal = subtotal(state.lines, catalog)
   const billTotal = Math.max(0, billSubtotal - state.discount)
-  const customer = customers.find(c => c.id === state.customerId)
+  const customer = customerCatalog.find(c => c.id === state.customerId)
   const todayReceipts = state.receipts.filter(r => dayKey(r.createdAt) === dayKey(now))
   const todaySales = todayReceipts.reduce((s, r) => s + r.total, 0)
   const todayPaid = todayReceipts.reduce((s, r) => s + r.paid, 0)
-  const pendingDue = state.receipts.reduce((s, r) => s + r.due, 0)
+  const windowReceipts = filterReceiptsByWindow(state.receipts, reportWindow, now)
+  const windowSales = windowReceipts.reduce((s, r) => s + r.total, 0)
+  const windowPaid = windowReceipts.reduce((s, r) => s + r.paid, 0)
+  const pendingDue = customerCatalog.reduce((sum, c) => sum + customerBalance(c, state.receipts, state.transactions).totalDue, 0)
   const paidAmount = parseMoney(received) ?? 0
   const goSearch = () => { setQuantityProduct(null); setInputError(''); requestAnimationFrame(() => searchRef.current?.focus()) }
   const closeDialog = () => { if (!busy) { setDialog(null); setModalError('') } }
@@ -149,7 +390,7 @@ export default function App() {
     const previousReceiptCount = state.receipts.length
     const previousDiscount = state.discount
     const lines = state.lines.filter((_, i) => i !== index)
-    setState(s => ({ ...s, lines, discount: Math.min(s.discount, Math.max(0, subtotal(lines) - 1)) }))
+    setState(s => ({ ...s, lines, discount: Math.min(s.discount, Math.max(0, subtotal(lines, catalog) - 1)) }))
     setBillSelection(Math.max(0, index - 1))
     setToast({ text: t('productRemoved'), undo: () => setState(s => {
       if (s.receipts.length !== previousReceiptCount) return s
@@ -157,19 +398,19 @@ export default function App() {
       const existing = restored.findIndex(l => l.productId === removed.productId)
       if (existing >= 0) restored[existing] = { ...restored[existing], quantity: restored[existing].quantity + removed.quantity }
       else restored.splice(Math.min(index, restored.length), 0, removed)
-      return { ...s, lines: restored, discount: Math.min(Math.max(s.discount, previousDiscount), Math.max(0, subtotal(restored) - 1)) }
+      return { ...s, lines: restored, discount: Math.min(Math.max(s.discount, previousDiscount), Math.max(0, subtotal(restored, catalog) - 1)) }
     }) })
   }
   const editLine = (index: number) => { setBillSelection(index); setQty(String(state.lines[index].quantity / 1000)); openDialog('edit') }
   const updateLine = () => {
     const line = state.lines[billSelection]
     if (!line) return
-    const product = findProduct(line.productId)
+    const product = findItem(line.productId)
     const parsed = parseQuantity(qty, product.unit)
     if (parsed === null) { setModalError(t('invalidQuantity')); return }
     if (parsed > stockFor(product, state.receipts)) { setModalError(t('noStock')); return }
     const lines = state.lines.map((l, i) => i === billSelection ? { ...l, quantity: parsed } : l)
-    setState(s => ({ ...s, lines, discount: Math.min(s.discount, Math.max(0, subtotal(lines) - 1)) }))
+    setState(s => ({ ...s, lines, discount: Math.min(s.discount, Math.max(0, subtotal(lines, catalog) - 1)) }))
     closeDialog()
   }
   const completeSale = async () => {
@@ -193,9 +434,10 @@ export default function App() {
   }
   const exportBackup = () => { downloadJson({ version: 1, exportedAt: new Date().toISOString(), products, customers, state }, `hisab-backup-${dayKey(now)}.json`); notify('backupExported') }
   const exportCsv = () => {
-    const rows = [['Receipt', 'Date (UTC)', 'Total (BDT)', 'Paid (BDT)', 'Due (BDT)', 'Method'], ...state.receipts.map(r => [receiptNumber(r.number), r.createdAt, (r.total / 100).toFixed(2), (r.paid / 100).toFixed(2), (r.due / 100).toFixed(2), r.method])]
+    const listToExport = windowReceipts
+    const rows = [['Receipt', 'Date (UTC)', 'Total (BDT)', 'Paid (BDT)', 'Due (BDT)', 'Method'], ...listToExport.map(r => [receiptNumber(r.number), r.createdAt, (r.total / 100).toFixed(2), (r.paid / 100).toFixed(2), (r.due / 100).toFixed(2), r.method])]
     const url = URL.createObjectURL(new Blob([rows.map(row => row.map(value => `"${String(value).replaceAll('"', '""')}"`).join(',')).join('\r\n')], { type: 'text/csv;charset=utf-8;' }))
-    const a = document.createElement('a'); a.href = url; a.download = `hisab-sales-${dayKey(now)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
+    const a = document.createElement('a'); a.href = url; a.download = `hisab-sales-${reportWindow}-${dayKey(now)}.csv`; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000)
   }
 
   useEffect(() => {
@@ -270,7 +512,7 @@ export default function App() {
               if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1))); setSelected(next); productRefs.current[next]?.scrollIntoView({ block: 'nearest' }) }
               if (e.key === 'Enter') { e.preventDefault(); const exact = filtered.find(p => p.code === query.trim()); if (exact ?? filtered[selected]) chooseProduct((exact ?? filtered[selected])!) }
             }}/><kbd>F2</kbd>{query && <button className="icon-button" aria-label={t('clear')} onClick={() => { setQuery(''); goSearch() }}><Icon name="close" size={14}/></button>}</div>
-            <div className="category-tabs" aria-label="Product categories">{(['all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}{c === 'all' && <span>{products.length}</span>}</button>)}</div>
+            <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}{c === 'recent' ? <span>{recentProducts.length}</span> : c === 'all' ? <span>{catalog.length}</span> : null}</button>)}</div>
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>
             <div className="product-list" aria-label={t('products')}>
               {filtered.map((p, index) => <button key={p.id} ref={el => { productRefs.current[index] = el }} className={`product-row ${selected === index ? 'selected' : ''} ${quantityProduct?.id === p.id ? 'entering' : ''}`} onClick={() => { setSelected(index); chooseProduct(p) }} onFocus={() => setSelected(index)} onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))); productRefs.current[next]?.focus() } }}>
@@ -295,7 +537,7 @@ export default function App() {
               if (e.key === 'Enter' && state.lines[billSelection]) { e.preventDefault(); editLine(billSelection) }
               if (e.key === 'Delete' && state.lines[billSelection]) { e.preventDefault(); removeLine(billSelection) }
             }}>
-              {state.lines.map((line, index) => { const p = findProduct(line.productId); return <div key={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
+              {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
                 <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{money(p.price)} / {p.unit}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
                 <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}>{quantityText(line.quantity)}<span>{p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
               </div> })}
@@ -306,20 +548,68 @@ export default function App() {
           </section>
         </div> : <section className="secondary-view">
           <div className="metrics-grid">{(view === 'inventory' ? [
-            { label: 'variants', value: String(products.length), icon: 'inventory' },
-            { label: 'stockValue', value: `৳ ${money(products.reduce((s, p) => s + lineTotal(p.price, stockFor(p, state.receipts)), 0))}`, icon: 'cash' },
-            { label: 'lowStock', value: String(products.filter(p => stockFor(p, state.receipts) < 10000).length), icon: 'reports' },
+            { label: 'variants', value: String(catalog.length), icon: 'inventory' },
+            { label: 'stockValue', value: `৳ ${money(catalog.reduce((s, p) => s + lineTotal(p.price, stockFor(p, state.receipts)), 0))}`, icon: 'cash' },
+            { label: 'lowStock', value: String(catalog.filter(p => stockFor(p, state.receipts) < 10000).length), icon: 'reports' },
           ] : view === 'accounts' ? [
-            { label: 'customersLabel', value: String(customers.length), icon: 'accounts' },
+            { label: 'customersLabel', value: String(customerCatalog.length), icon: 'accounts' },
             { label: 'outstanding', value: `৳ ${money(pendingDue)}`, icon: 'cash' },
             { label: 'totalSales', value: `৳ ${money(state.receipts.reduce((s, r) => s + r.total, 0))}`, icon: 'reports' },
           ] : [
-            { label: 'salesToday', value: `৳ ${money(todaySales)}`, icon: 'reports' },
-            { label: 'collected', value: `৳ ${money(todayPaid)}`, icon: 'cash' },
-            { label: 'receiptsToday', value: String(todayReceipts.length), icon: 'sales' },
+            { label: reportWindow === 'today' ? 'salesToday' : 'salesInWindow', value: `৳ ${money(windowSales)}`, icon: 'reports' },
+            { label: reportWindow === 'today' ? 'collected' : 'collectedInWindow', value: `৳ ${money(windowPaid)}`, icon: 'cash' },
+            { label: reportWindow === 'today' ? 'receiptsToday' : 'receiptsInWindow', value: String(windowReceipts.length), icon: 'sales' },
           ]).map(metric => <div className="metric-card" key={metric.label}><div><span className="eyebrow">{t(metric.label as CopyKey)}</span><Icon name={metric.icon}/></div><strong>{metric.value}</strong></div>)}</div>
-          <div className="panel data-panel"><div className="panel-heading"><div className="section-title"><span className="section-number">01</span><h2>{t(view === 'inventory' ? 'products' : view === 'accounts' ? 'customerAccounts' : 'recentSales')}</h2></div>{view === 'reports' && <button className="text-button" onClick={exportCsv}><Icon name="download" size={16}/>{t('exportCsv')}</button>}</div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('price')}</th></tr></thead><tbody>{products.map(p => <tr key={p.id}><td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td><td><code>{p.code}</code></td><td>{quantityText(stockFor(p, state.receipts))} <small>{p.unit}</small></td><td>৳ {money(p.price)}</td></tr>)}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th>{t('balance')}</th></tr></thead><tbody>{customers.map(c => { const due = state.receipts.filter(r => r.customer?.id === c.id).reduce((s, r) => s + r.due, 0); return <tr key={c.id}><td><div className="account-name"><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><strong>{c[lang]}</strong></div></td><td>{c.phone}</td><td>{due ? <strong>৳ {money(due)}</strong> : <span className="settled-badge">{t('settled')}</span>}</td></tr> })}</tbody></table></div> : state.receipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th>{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...state.receipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td>৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
+          <div className="panel data-panel">
+            <div className="panel-heading">
+              <div className="section-title">
+                <span className="section-number">01</span>
+                <h2>{t(view === 'inventory' ? 'products' : view === 'accounts' ? 'customerAccounts' : 'recentSales')}</h2>
+                {view === 'accounts' && <span className="count-badge">{customerCatalog.length}</span>}
+                {view === 'reports' && <span className="count-badge">{windowReceipts.length}</span>}
+              </div>
+              <div className="inventory-header-actions">
+                {view === 'inventory' && <button className="provision-trigger" onClick={openProvisionDialog}><Icon name="plus" size={15}/><span>{t('provisionItem')}</span></button>}
+                {view === 'accounts' && <button className="provision-trigger" onClick={openCustomerProvisionDialog}><Icon name="plus" size={15}/><span>{t('provisionCustomer')}</span></button>}
+                {view === 'reports' && <>
+                  <div className="report-window-container">
+                    <label htmlFor="report-window" className="report-window-label"><Icon name="reports" size={13}/><span>{t('reportWindow')}</span></label>
+                    <select id="report-window" className="report-window-select" value={reportWindow} onChange={e => setReportWindow(e.target.value as ReportWindow)}>
+                      <option value="today">{t('windowToday')}</option>
+                      <option value="3days">{t('window3Days')}</option>
+                      <option value="7days">{t('window7Days')}</option>
+                      <option value="month">{t('windowMonth')}</option>
+                    </select>
+                  </div>
+                  <button className="text-button" onClick={exportCsv}><Icon name="download" size={16}/>{t('exportCsv')}</button>
+                </>}
+              </div>
+            </div>
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th></tr></thead><tbody>{catalog.map(p => {
+              const cost = productCost(p)
+              const margin = unitMargin(p)
+              const marginPct = unitMarginPercent(p)
+              const purchased = p.purchased ?? p.stock
+              return <tr key={p.id}>
+                <td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td>
+                <td><code>{p.code}</code></td>
+                <td>{quantityText(stockFor(p, state.receipts))} <small>{p.unit}</small></td>
+                <td>৳ {money(cost)}</td>
+                <td>৳ {money(p.price)}</td>
+                <td><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
+                <td>{quantityText(purchased)} <small>{p.unit}</small></td>
+              </tr>
+            })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th>{t('totalDue')}</th><th>{t('loan')}</th><th>{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
+              const b = customerBalance(c, state.receipts, state.transactions)
+              return <tr key={c.id}>
+                <td><div className="account-name"><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><strong>{c[lang]}</strong></div></td>
+                <td><code>{c.phone}</code></td>
+                <td>{b.totalDue > 0 ? <strong>৳ {money(b.totalDue)}</strong> : <span className="settled-badge">{t('settled')}</span>}</td>
+                <td>{b.loan > 0 ? <span className="tx-badge loan">৳ {money(b.loan)}</span> : '—'}</td>
+                <td><span className="tx-badge payment">৳ {money(b.availableCredit)}</span></td>
+                <td><button className="icon-button" aria-label={`${t('viewProfile')}: ${c[lang]}`} onClick={() => openCustomerProfile(c)}><Icon name="chevron" size={16}/></button></td>
+              </tr>
+            })}</tbody></table></div> : windowReceipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th>{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...windowReceipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td>৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
             <div className="data-footnote">{t(view === 'inventory' ? 'catalogNote' : view === 'accounts' ? 'accountNote' : 'reportNote')}</div>
           </div>{view === 'accounts' && <p className="phase-note">{t('cashbookNote')}</p>}
         </section>}
@@ -332,20 +622,214 @@ export default function App() {
 
     {toast && <div className="toast" role="status"><Icon name="check" size={16}/><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null) }}>{t('undo')}</button>}<button className="icon-button" aria-label={t('close')} onClick={() => setToast(null)}><Icon name="close" size={13}/></button></div>}
 
-    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : 'receipt')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
+    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : dialog === 'newCustomer' ? 'newCustomer' : dialog === 'customerProfile' ? 'customerProfile' : dialog === 'addTx' ? 'addTransaction' : 'receipt')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
       {dialog === 'payment' && <form onSubmit={e => { e.preventDefault(); completeSale() }}><div className="eyebrow modal-eyebrow">{t('counter')}<span> / </span>#{receiptNumber(state.receipts.length + 1)}</div><h3>{t('payment')}<span className="heading-dot">.</span></h3><div className="payment-total"><span>{t('total')}</span><strong><small>৳</small>{money(billTotal)}</strong><span>{customer ? customer[lang] : t('walkIn')} · {state.lines.length} {t('items')}</span></div><div className="payment-methods" aria-label={t('method')}>{(['cash', 'mobile', 'bank'] as const).map(method => <button key={method} type="button" className={method === paymentMethod ? 'active' : ''} onClick={() => { setPaymentMethod(method); setModalError('') }} aria-pressed={method === paymentMethod}><Icon name={method}/>{t(method)}</button>)}</div><div className="payment-input-label"><label htmlFor="received">{t('received')}</label><button type="button" className="text-button" onClick={() => setReceived((billTotal / 100).toFixed(2))}>{t('exact')}</button></div><div className="money-input"><span>৳</span><input id="received" inputMode="decimal" value={received} onChange={e => { setReceived(e.target.value); setModalError('') }} aria-invalid={!!modalError} aria-describedby={modalError ? 'payment-error' : undefined}/><small>BDT</small></div><div className={`change-row ${paidAmount < billTotal ? 'due' : ''}`}><span>{t(paidAmount < billTotal ? 'due' : 'change')}</span><strong>৳ {money(Math.abs(paidAmount - billTotal))}</strong></div>{modalError && <p className="field-error" id="payment-error" role="alert">{modalError}</p>}<button className="primary-button" type="submit" disabled={busy}><span>{t(busy ? 'completing' : 'complete')}</span><kbd>↵</kbd></button><p className="dialog-note">{t('paymentNote')}</p></form>}
 
-      {dialog === 'customer' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('chooseCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('customerHint')}</p><div className="search-box"><Icon name="search" size={19}/><input aria-label={t('customerSearch')} placeholder={t('customerSearch')} value={customerQuery} onChange={e => setCustomerQuery(e.target.value)}/></div><div className="customer-options"><button onClick={() => { setState(s => ({ ...s, customerId: null })); closeDialog() }}><span className="initial-avatar"><Icon name="accounts"/></span><span><strong>{t('walkIn')}</strong><small>—</small></span>{!customer && <Icon name="check"/>}</button>{customers.filter(c => `${c.en} ${c.bn} ${c.phone}`.toLowerCase().includes(customerQuery.toLowerCase())).map(c => <button key={c.id} onClick={() => { setState(s => ({ ...s, customerId: c.id })); closeDialog() }}><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><span><strong>{c[lang]}</strong><small>{c.phone}</small></span>{customer?.id === c.id && <Icon name="check"/>}</button>)}</div></>}
+      {dialog === 'customer' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('chooseCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('customerHint')}</p><div className="search-box"><Icon name="search" size={19}/><input aria-label={t('customerSearch')} placeholder={t('customerSearch')} value={customerQuery} onChange={e => setCustomerQuery(e.target.value)}/></div><div className="customer-options"><button onClick={() => { setState(s => ({ ...s, customerId: null })); closeDialog() }}><span className="initial-avatar"><Icon name="accounts"/></span><span><strong>{t('walkIn')}</strong><small>—</small></span>{!customer && <Icon name="check"/>}</button>{customerCatalog.filter(c => `${c.en} ${c.bn} ${c.phone}`.toLowerCase().includes(customerQuery.toLowerCase())).map(c => <button key={c.id} onClick={() => { setState(s => ({ ...s, customerId: c.id })); closeDialog() }}><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><span><strong>{c[lang]}</strong><small>{c.phone}</small></span>{customer?.id === c.id && <Icon name="check"/>}</button>)}</div></>}
 
       {dialog === 'discount' && <form onSubmit={e => { e.preventDefault(); const value = parseMoney(discountInput); if (value === null) { setModalError(t('invalidAmount')); return } if (value >= billSubtotal) { setModalError(t('discountInvalid')); return } setState(s => ({ ...s, discount: value })); closeDialog() }}><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('discountTitle')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('discountHint')}</p><label className="field-label" htmlFor="discount">{t('discount')} · BDT</label><div className="money-input"><span>৳</span><input id="discount" value={discountInput} onChange={e => { setDiscountInput(e.target.value); setModalError('') }} inputMode="decimal" placeholder="0.00"/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('apply')}<kbd>↵</kbd></button></div></form>}
 
-      {dialog === 'edit' && state.lines[billSelection] && <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{findProduct(state.lines[billSelection].productId)[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{t('quantity')} · {findProduct(state.lines[billSelection].productId).unit}</label><div className="money-input"><input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>}
+      {dialog === 'edit' && state.lines[billSelection] && <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{findItem(state.lines[billSelection].productId)[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{t('quantity')} · {findItem(state.lines[billSelection].productId).unit}</label><div className="money-input"><input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>}
 
       {dialog === 'clear' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('clearTitle')}</h3><p className="modal-description">{t('clearHint')}</p><div className="dialog-actions"><button className="secondary-button" data-initial-focus onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" onClick={() => { setState(s => ({ ...s, lines: [], discount: 0, customerId: null })); closeDialog(); goSearch() }}>{t('confirmClear')}</button></div></>}
 
       {dialog === 'shortcuts' && <><div className="eyebrow modal-eyebrow"><Icon name="keyboard" size={17}/> HISAB / KEYS</div><h3>{t('shortcutTitle')}</h3><p className="modal-description">{t('shortcutHint')}</p><div className="shortcut-guide">{([['F2', 'focusSearch'], ['↑  ↓', 'navigate'], ['Enter', 'select'], ['+', 'openPayment'], ['Alt + B', 'billFocus'], ['Enter', 'editBill'], ['Delete', 'removeBill'], ['Esc', 'closeDialog'], ['?', 'showHelp']] as [string, CopyKey][]).map(([key, label]) => <div key={label}><span>{t(label)}</span><kbd>{key}</kbd></div>)}</div><p className="dialog-note">{t('shortcutsNote')}</p></>}
 
       {dialog === 'settings' && <><div className="eyebrow modal-eyebrow">HISAB / PREFERENCES</div><h3>{t('settings')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('settingsHint')}</p><div className="setting-row"><span>{t('language')}</span><div className="setting-language"><button onClick={() => setLang('en')} className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'}>English</button><button onClick={() => setLang('bn')} className={lang === 'bn' ? 'active' : ''} aria-pressed={lang === 'bn'}>বাংলা</button></div></div><div className="setting-row"><span>{t('appearance')}</span><div className="setting-language"><button onClick={() => setTheme('light')} className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'}>{t('light')}</button><button onClick={() => setTheme('dark')} className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'}>{t('dark')}</button></div></div><div className="setting-row"><span>{t('offlineAccess')}</span><span className={`offline-status ${offlineStatus}`} role="status">{t(offlineStatus === 'ready' ? 'offlineReady' : offlineStatus === 'preparing' ? 'offlinePreparing' : offlineStatus === 'development' ? 'offlineDevelopment' : 'offlineUnavailable')}</span></div><div className="storage-setting"><h4>{t('storage')}</h4><p>{t('storageHint')}</p><button className="secondary-button" onClick={exportBackup}><Icon name="download" size={16}/>{t('export')}</button></div><p className="dialog-note">{t('version')}</p></>}
+
+      {dialog === 'newItem' && <form onSubmit={e => { e.preventDefault(); createProduct() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('inventory')}</div><h3>{t('newItem')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newItemHint')}</p>
+        <div className="form-grid">
+          <div className="form-group">
+            <label htmlFor="item-code">{t('code')} *</label>
+            <input id="item-code" className="form-input" value={newCode} onChange={e => { setNewCode(e.target.value); setModalError('') }} placeholder="e.g. 113" autoFocus required/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="item-category">{t('categoryLabel')}</label>
+            <select id="item-category" className="form-input" value={newCategory} onChange={e => setNewCategory(e.target.value as Exclude<Category, 'all' | 'recent'>)}>
+              <option value="staples">{t('staples')}</option>
+              <option value="fresh">{t('fresh')}</option>
+              <option value="household">{t('household')}</option>
+            </select>
+          </div>
+          <div className="form-group span-2">
+            <label htmlFor="item-name-en">{t('productNameEn')} *</label>
+            <input id="item-name-en" className="form-input" value={newNameEn} onChange={e => { setNewNameEn(e.target.value); setModalError('') }} placeholder="e.g. Mustard oil" required/>
+          </div>
+          <div className="form-group span-2">
+            <label htmlFor="item-name-bn">{t('productNameBn')}</label>
+            <input id="item-name-bn" className="form-input" value={newNameBn} onChange={e => setNewNameBn(e.target.value)} placeholder="e.g. সরিষার তেল"/>
+          </div>
+          <div className="form-group span-2">
+            <label htmlFor="item-detail">{t('productDetail')}</label>
+            <input id="item-detail" className="form-input" value={newDetail} onChange={e => setNewDetail(e.target.value)} placeholder="e.g. Radhuni · 500 ml"/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="item-unit">{t('unitLabel')}</label>
+            <select id="item-unit" className="form-input" value={newUnit} onChange={e => setNewUnit(e.target.value as Product['unit'])}>
+              <option value="kg">kg (Kilogram)</option>
+              <option value="pc">pc (Piece / Packet)</option>
+              <option value="L">L (Litre)</option>
+            </select>
+          </div>
+          <div className="form-group">
+            <label htmlFor="item-purchased">{t('purchasedQty')} ({newUnit}) *</label>
+            <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="item-cost">{t('costPrice')} (৳) *</label>
+            <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 150.00" required/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="item-price">{t('sellingPrice')} (৳) *</label>
+            <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder="e.g. 175.00" required/>
+          </div>
+        </div>
+
+        {(() => {
+          const c = parseMoney(newCost)
+          const p = parseMoney(newPrice)
+          if (c !== null && p !== null) {
+            const m = p - c
+            const pct = p > 0 ? (m / p) * 100 : 0
+            return <div className="margin-preview">
+              <span>{t('unitMargin')}:</span>
+              <strong>৳ {money(m)} ({pct.toFixed(1)}%)</strong>
+            </div>
+          }
+          return null
+        })()}
+
+        {modalError && <p className="field-error" role="alert">{modalError}</p>}
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button>
+          <button className="primary-button" type="submit">{t('saveItem')}<kbd>↵</kbd></button>
+        </div>
+      </form>}
+
+      {dialog === 'newCustomer' && <form onSubmit={e => { e.preventDefault(); createCustomer() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('accounts')}</div><h3>{t('newCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newCustomerHint')}</p>
+        <div className="form-grid">
+          <div className="form-group span-2">
+            <label htmlFor="cust-name-en">{t('customerNameEn')} *</label>
+            <input id="cust-name-en" className="form-input" value={newCustEn} onChange={e => { setNewCustEn(e.target.value); setModalError('') }} placeholder="e.g. Rafiqul Islam" autoFocus required/>
+          </div>
+          <div className="form-group span-2">
+            <label htmlFor="cust-name-bn">{t('customerNameBn')}</label>
+            <input id="cust-name-bn" className="form-input" value={newCustBn} onChange={e => setNewCustBn(e.target.value)} placeholder="e.g. রফিকুল ইসলাম"/>
+          </div>
+          <div className="form-group span-2">
+            <label htmlFor="cust-phone">{t('customerPhone')} *</label>
+            <input id="cust-phone" className="form-input" value={newCustPhone} onChange={e => { setNewCustPhone(e.target.value); setModalError('') }} placeholder="01700 000000" required/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="cust-credit">{t('creditLimit')} (৳)</label>
+            <input id="cust-credit" className="form-input" inputMode="decimal" value={newCustCreditLimit} onChange={e => setNewCustCreditLimit(e.target.value)} placeholder="5000"/>
+          </div>
+          <div className="form-group">
+            <label htmlFor="cust-opening">{t('openingBalance')} (৳)</label>
+            <input id="cust-opening" className="form-input" inputMode="decimal" value={newCustOpeningDue} onChange={e => setNewCustOpeningDue(e.target.value)} placeholder="0.00"/>
+          </div>
+        </div>
+        {modalError && <p className="field-error" role="alert">{modalError}</p>}
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button>
+          <button className="primary-button" type="submit">{t('saveItem')}<kbd>↵</kbd></button>
+        </div>
+      </form>}
+
+      {dialog === 'customerProfile' && activeCustomer && (() => {
+        const bal = customerBalance(activeCustomer, state.receipts, state.transactions)
+        const ledger = customerLedger(activeCustomer.id, state.receipts, state.transactions)
+        return <>
+          <div className="eyebrow modal-eyebrow">{t('accounts')}<span> / </span>{t('customerProfile')}</div>
+          <div className="customer-profile-header">
+            <div className="customer-profile-avatar">{activeCustomer.en.split(' ').map(s => s[0]).join('')}</div>
+            <div className="customer-profile-info">
+              <h3>{activeCustomer[lang]}<span className="heading-dot">.</span></h3>
+              <p>{activeCustomer.phone} {activeCustomer.creditLimit ? `· ${t('creditLimit')}: ৳ ${money(activeCustomer.creditLimit)}` : ''}</p>
+            </div>
+          </div>
+
+          <div className="customer-stats-grid">
+            <div className={`customer-stat-card ${bal.totalDue > 0 ? 'due' : ''}`}>
+              <span>{t('totalDue')}</span>
+              <strong>৳ {money(bal.totalDue)}</strong>
+            </div>
+            <div className={`customer-stat-card ${bal.loan > 0 ? 'loan' : ''}`}>
+              <span>{t('loan')}</span>
+              <strong>৳ {money(bal.loan)}</strong>
+            </div>
+            <div className="customer-stat-card credit">
+              <span>{t('availableCredit')}</span>
+              <strong>৳ {money(bal.availableCredit)}</strong>
+            </div>
+          </div>
+
+          <div className="tx-action-bar">
+            <button type="button" onClick={() => openAddTransaction('payment')}><Icon name="cash" size={14}/><span>{t('recordPayment')}</span></button>
+            <button type="button" onClick={() => openAddTransaction('loan')}><Icon name="plus" size={14}/><span>{t('recordLoan')}</span></button>
+            <button type="button" onClick={() => openAddTransaction('credit_adjust')}><Icon name="reset" size={14}/><span>{t('recordAdjustment')}</span></button>
+          </div>
+
+          <div className="panel-heading" style={{ height: 38, padding: '0 4px', borderBottom: 'none' }}>
+            <div className="section-title">
+              <span className="section-number">TX</span>
+              <h2 style={{ fontSize: 13 }}>{t('txHistory')}</h2>
+              <span className="count-badge">{ledger.length}</span>
+            </div>
+          </div>
+
+          <div className="tx-table-wrap">
+            {ledger.length ? <table className="tx-table">
+              <thead>
+                <tr>
+                  <th>{t('time')}</th>
+                  <th>{t('typeLabel')}</th>
+                  <th>{t('amount')}</th>
+                  <th>{t('productDetail')}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[...ledger].reverse().map(tx => (
+                  <tr key={tx.id}>
+                    <td><small>{new Date(tx.createdAt).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short' })} {new Date(tx.createdAt).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</small></td>
+                    <td><span className={`tx-badge ${tx.type}`}>{tx.type === 'sale_due' ? t('txSaleDue') : tx.type === 'payment' ? t('txPayment') : tx.type === 'loan' ? t('txLoan') : t('txAdjustment')}</span></td>
+                    <td><strong>৳ {money(tx.amount)}</strong></td>
+                    <td><small>{tx.note ?? '—'}</small></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table> : <div className="empty-state" style={{ minHeight: 120, padding: 20 }}><p>{t('noTx')}</p></div>}
+          </div>
+
+          <div className="dialog-actions">
+            <button className="secondary-button" type="button" onClick={closeDialog}>{t('close')}</button>
+          </div>
+        </>
+      })()}
+
+      {dialog === 'addTx' && activeCustomer && <form onSubmit={e => { e.preventDefault(); recordTransaction() }}>
+        <div className="eyebrow modal-eyebrow">{activeCustomer[lang]}<span> / </span>{t('addTransaction')}</div>
+        <h3>{txType === 'payment' ? t('recordPayment') : txType === 'loan' ? t('recordLoan') : t('recordAdjustment')}<span className="heading-dot">.</span></h3>
+        <p className="modal-description">{t('balanceHint')}</p>
+
+        <label className="field-label" htmlFor="tx-amount">{t('amount')} (৳) *</label>
+        <div className="money-input">
+          <span>৳</span>
+          <input id="tx-amount" value={txAmount} onChange={e => { setTxAmount(e.target.value); setModalError('') }} inputMode="decimal" placeholder="0.00" autoFocus required/>
+          <small>BDT</small>
+        </div>
+
+        <div className="form-group" style={{ marginTop: 15 }}>
+          <label htmlFor="tx-note">{t('productDetail')}</label>
+          <input id="tx-note" className="form-input" value={txNote} onChange={e => setTxNote(e.target.value)} placeholder="e.g. Cash payment / Eid advance"/>
+        </div>
+
+        {modalError && <p className="field-error" role="alert">{modalError}</p>}
+        <div className="dialog-actions">
+          <button className="secondary-button" type="button" onClick={() => openCustomerProfile(activeCustomer)}>{t('cancel')}</button>
+          <button className="primary-button" type="submit">{t('apply')}<kbd>↵</kbd></button>
+        </div>
+      </form>}
 
       {dialog === 'receipt' && activeReceipt && <><div className="receipt-dialog-heading">{justCompleted && <span className="success-mark"><Icon name="check" size={22}/></span>}<div className="eyebrow">{t(justCompleted ? 'receiptSaved' : 'receipt')}</div><h3>{t(justCompleted ? 'saleComplete' : 'receipt')}</h3></div>{renderReceipt(activeReceipt)}<div className="dialog-actions"><button className="secondary-button" onClick={() => window.print()}><Icon name="print" size={17}/>{t('printReceipt')}</button><button className="primary-button" data-initial-focus onClick={() => { closeDialog(); if (justCompleted) { setView('sales'); goSearch() } }}>{t(justCompleted ? 'newSale' : 'close')}<Icon name="arrow" size={18}/></button></div></>}
     </Modal>}
