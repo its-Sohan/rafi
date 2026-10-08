@@ -4,5 +4,12 @@
   "assets": {
     "directory": "./dist",
     "not_found_handling": "single-page-application"
-  }
+  },
+  "d1_databases": [
+    {
+      "binding": "DB",
+      "database_name": "hisab-db",
+      "database_id": "b36250e4-6735-4776-b916-801d64b6412e"
+    }
+  ]
 }

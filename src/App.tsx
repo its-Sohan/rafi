@@ -36,6 +36,7 @@ import {
 import { downloadJson, loadState, saveState } from './storage'
 import { translator, type CopyKey } from './i18n'
 import type { OfflineStatus } from './offline'
+import { useLedgerMotion } from './useLedgerMotion'
 
 type View = 'sales' | 'inventory' | 'accounts' | 'reports'
 type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | 'itemStats' | null
@@ -508,6 +509,7 @@ export default function App() {
 
   const billSubtotal = subtotal(state.lines, catalog)
   const billTotal = Math.max(0, billSubtotal - state.discount)
+  const motionRoot = useLedgerMotion({ lines: state.lines, total: billTotal, receipts: state.receipts.length, ready, toast })
   const customer = customerCatalog.find(c => c.id === state.customerId)
   const todayReceipts = state.receipts.filter(r => dayKey(r.createdAt) === dayKey(now))
   const todaySales = todayReceipts.reduce((s, r) => s + r.total, 0)
@@ -630,7 +632,7 @@ export default function App() {
     <p className="receipt-thanks">{t('thanks')}</p><p className="receipt-local">{t('localReceipt')}</p>
   </div>
 
-  return <div className={`app-shell lang-${lang}`}>
+  return <div ref={motionRoot} className={`app-shell lang-${lang}`}>
     <aside className="sidebar" aria-label="Main navigation">
       <button className="brand-mark" aria-label="Hisab sales counter" onClick={() => setView('sales')}><PixelMark/></button>
       <div className="side-nav">{(['sales', 'inventory', 'accounts', 'reports'] as View[]).map((item, index) => <button key={item} className={`nav-button ${view === item ? 'active' : ''}`} onClick={() => setView(item)} aria-label={t(item)} aria-current={view === item ? 'page' : undefined} title={t(item)}><Icon name={item} size={23}/><span>{lang === 'en' && item === 'sales' ? 'Counter' : t(item)}</span><i className="nav-index">0{index + 1}</i></button>)}</div>
@@ -758,7 +760,7 @@ export default function App() {
               if (e.key === 'Enter' && state.lines[billSelection]) { e.preventDefault(); editLine(billSelection) }
               if (e.key === 'Delete' && state.lines[billSelection]) { e.preventDefault(); removeLine(billSelection) }
             }}>
-              {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
+              {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} data-product-id={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
                 <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{money(p.price)} / {p.unit}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
                 <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}>{quantityText(line.quantity)}<span>{p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
               </div> })}
@@ -781,7 +783,7 @@ export default function App() {
             { label: reportWindow === 'today' ? 'profitToday' : 'profitInWindow', value: `৳ ${money(windowProfit)}`, icon: 'cash' },
             { label: reportWindow === 'today' ? 'collected' : 'collectedInWindow', value: `৳ ${money(windowPaid)}`, icon: 'cash' },
             { label: reportWindow === 'today' ? 'receiptsToday' : 'receiptsInWindow', value: String(windowReceipts.length), icon: 'sales' },
-          ]).map(metric => <div className="metric-card" key={metric.label}><div><span className="eyebrow">{t(metric.label as CopyKey)}</span><Icon name={metric.icon}/></div><strong>{metric.value}</strong></div>)}</div>
+          ]).map(metric => <div className="metric-card" key={metric.label}><div><span className="eyebrow">{t(metric.label as CopyKey)}</span><Icon name={metric.icon}/></div><strong key={metric.value}>{metric.value}</strong></div>)}</div>
           <div className="panel data-panel">
             <div className="panel-heading">
               <div className="section-title">

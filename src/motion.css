@@ -1,0 +1,140 @@
+/* Motion only. Resting geometry, type, colors, and spacing belong to styles.css. */
+@media (prefers-reduced-motion: no-preference) {
+  .product-art svg {
+    transition: translate 140ms cubic-bezier(.2,.75,.3,1);
+  }
+  .product-row:hover .product-art svg {
+    translate: 0 -2px;
+  }
+  .row-enter {
+    transition: translate 140ms ease-out;
+  }
+  .product-row:hover .row-enter {
+    translate: 2px 0;
+  }
+  .payment-button-right>svg, .add-button>svg {
+    transition: translate 160ms cubic-bezier(.2,.75,.3,1);
+  }
+  .payment-button:hover:not(:disabled) .payment-button-right>svg,
+  .add-button:hover:not(:disabled)>svg {
+    translate: 3px 0;
+  }
+  .payment-button:active:not(:disabled),
+  .primary-button:active:not(:disabled),
+  .add-button:active:not(:disabled),
+  .secondary-button:active:not(:disabled) {
+    translate: 0 1px;
+  }
+  .nav-button:active>svg {
+    translate: 0 1px;
+  }
+  .quantity-lane.active .quantity-product-label {
+    animation: ledger-enter 150ms ease-out;
+  }
+  .payment-methods>button.active>svg {
+    animation: ledger-tap 180ms cubic-bezier(.2,.75,.3,1);
+  }
+  .modal {
+    animation: ledger-enter 160ms cubic-bezier(.2,.75,.3,1);
+  }
+  .metric-card>strong {
+    animation: ledger-number 180ms ease-out;
+  }
+  .success-mark {
+    position: relative;
+    animation: ledger-stamp 210ms cubic-bezier(.2,.75,.3,1);
+  }
+  .success-mark svg path, .toast>svg:first-child path {
+    stroke-dasharray: 32;
+    animation: ledger-check 280ms ease-out both;
+  }
+  .success-mark::before, .success-mark::after {
+    content: '';
+    position: absolute;
+    width: 3px;
+    height: 3px;
+    background: currentColor;
+    pointer-events: none;
+    opacity: 0;
+  }
+  .success-mark::before {
+    left: 0;
+    top: 0;
+    box-shadow: 46px 8px currentColor, 12px -6px currentColor;
+    animation: ledger-pixels-up 420ms 100ms ease-out both;
+  }
+  .success-mark::after {
+    right: 0;
+    bottom: 0;
+    box-shadow: -46px -8px currentColor, -12px 6px currentColor;
+    animation: ledger-pixels-down 420ms 100ms ease-out both;
+  }
+  .save-status.saved i {
+    animation: ledger-saved 450ms ease-out;
+  }
+  .dialog-payment button[type="submit"]:disabled {
+    position: relative;
+    overflow: hidden;
+  }
+  .dialog-payment button[type="submit"]:disabled::after {
+    content: '';
+    position: absolute;
+    left: 0;
+    bottom: 0;
+    width: 25%;
+    height: 2px;
+    background: currentColor;
+    opacity: .5;
+    animation: ledger-saving 900ms ease-in-out infinite;
+    pointer-events: none;
+  }
+}
+
+@keyframes ledger-enter {
+  from { opacity: .6; translate: 0 4px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ledger-number {
+  from { opacity: .7; translate: 0 2px; }
+  to { opacity: 1; translate: 0 0; }
+}
+@keyframes ledger-tap {
+  0% { transform: scale(.88); }
+  100% { transform: scale(1); }
+}
+@keyframes ledger-stamp {
+  from { opacity: .6; transform: scale(.92); }
+  to { opacity: 1; transform: scale(1); }
+}
+@keyframes ledger-check {
+  from { stroke-dashoffset: 32; }
+  to { stroke-dashoffset: 0; }
+}
+@keyframes ledger-pixels-up {
+  0% { opacity: 0; translate: 0 0; }
+  25% { opacity: .6; }
+  100% { opacity: 0; translate: -5px -6px; }
+}
+@keyframes ledger-pixels-down {
+  0% { opacity: 0; translate: 0 0; }
+  25% { opacity: .6; }
+  100% { opacity: 0; translate: 5px 6px; }
+}
+@keyframes ledger-saved {
+  0% { box-shadow: 0 0 0 0 currentColor; }
+  100% { box-shadow: 0 0 0 4px transparent; }
+}
+@keyframes ledger-saving {
+  from { translate: -100% 0; }
+  to { translate: 500% 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .bill-row, .bill-qty, .total-row>strong, .today-summary>strong, .toast {
+    animation: none !important;
+  }
+}
+@media print {
+  .success-mark::before, .success-mark::after { display: none; }
+  .modal, .metric-card>strong, .success-mark { animation: none !important; }
+}
