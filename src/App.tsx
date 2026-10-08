@@ -234,11 +234,11 @@ export default function App() {
           return
         }
         const vCode = row.code.trim() || `${codeTrim}-${i + 1}`
-        const vCost = parseMoney(row.cost)
+        const vTotalCost = parseMoney(row.cost)
         const vPrice = parseMoney(row.price)
         const vStock = parseQuantity(row.stock, newUnit)
 
-        if (vCost === null || vCost <= 0 || vPrice === null || vPrice <= 0) {
+        if (vTotalCost === null || vTotalCost <= 0 || vPrice === null || vPrice <= 0) {
           setModalError(t('invalidAmount'))
           return
         }
@@ -246,6 +246,8 @@ export default function App() {
           setModalError(t('invalidQuantity'))
           return
         }
+
+        const vCost = Math.round(vTotalCost * 1000 / vStock)
 
         const vProd: Product = {
           id: `p-${Date.now()}-${vCode}`,
@@ -281,8 +283,8 @@ export default function App() {
       setModalError(t('invalidAmount'))
       return
     }
-    const parsedCost = parseMoney(newCost)
-    if (parsedCost === null || parsedCost <= 0) {
+    const parsedTotalCost = parseMoney(newCost)
+    if (parsedTotalCost === null || parsedTotalCost <= 0) {
       setModalError(t('invalidAmount'))
       return
     }
@@ -291,6 +293,7 @@ export default function App() {
       setModalError(t('invalidQuantity'))
       return
     }
+    const parsedCost = Math.round(parsedTotalCost * 1000 / parsedPurchased)
 
     const existing = catalog.find(p => p.code.toLowerCase() === codeTrim.toLowerCase())
 
@@ -1049,7 +1052,7 @@ export default function App() {
                 <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
               </div>
               <div className="form-group">
-                <label htmlFor="item-cost">{isMoneyUnit(newUnit) ? t('costPerTaka') : t('costPrice')} (৳) *</label>
+                <label htmlFor="item-cost">{t('purchaseAmount')} (৳) *</label>
                 <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 20.00" required/>
               </div>
               <div className="form-group">
@@ -1064,13 +1067,13 @@ export default function App() {
           <div className="variant-builder-wrap">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="eyebrow">{t('variantBreakdown')} ({variantRows.length})</span>
-              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Set a name, code, cost, selling price, and opening stock for each variant.</small>
+              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Set a name, code, total purchase amount, selling price, and opening stock for each variant.</small>
             </div>
-            <div className="variant-builder-head" aria-hidden="true">
-              <span>Variant name</span><span>Code</span><span>Cost (৳)</span><span>Selling price (৳)</span><span>Opening stock ({newUnit})</span><span />
+            <div className={`variant-builder-head${variantRows.length > 1 ? ' has-remove' : ''}`} aria-hidden="true">
+              <span>Variant name</span><span>Code</span><span>Purchase amount (৳)</span><span>Selling price (৳)</span><span>Opening stock ({newUnit})</span><span />
             </div>
             {variantRows.map((vRow, idx) => (
-              <div key={vRow.id} className="variant-builder-row">
+              <div key={vRow.id} className={`variant-builder-row${variantRows.length > 1 ? ' has-remove' : ''}`}>
                 <input
                   aria-label={`Variant name, row ${idx + 1}`}
                   placeholder="e.g. 500 g, Blue"
@@ -1093,8 +1096,8 @@ export default function App() {
                   }}
                 />
                 <input
-                  aria-label={`Cost in taka, row ${idx + 1}`}
-                  placeholder="0.00"
+                  aria-label={`Total purchase amount in taka, row ${idx + 1}`}
+                  placeholder={lang === 'bn' ? 'ক্রয়মূল্য (৳)' : 'Cost (৳)'}
                   inputMode="decimal"
                   value={vRow.cost}
                   onChange={e => {
@@ -1106,7 +1109,7 @@ export default function App() {
                 />
                 <input
                   aria-label={`Selling price in taka, row ${idx + 1}`}
-                  placeholder="0.00"
+                  placeholder={lang === 'bn' ? 'বিক্রয়মূল্য (৳)' : 'Price (৳)'}
                   inputMode="decimal"
                   value={vRow.price}
                   onChange={e => {
@@ -1118,7 +1121,7 @@ export default function App() {
                 />
                 <input
                   aria-label={`Opening stock in ${newUnit}, row ${idx + 1}`}
-                  placeholder="0"
+                  placeholder={lang === 'bn' ? `মজুত (${newUnit})` : `Stock (${newUnit})`}
                   inputMode="decimal"
                   value={vRow.stock}
                   onChange={e => {
@@ -1158,17 +1161,18 @@ export default function App() {
 
         {!hasVariants && (() => {
           const existingItem = catalog.find(p => p.code.toLowerCase() === newCode.trim().toLowerCase())
-          const c = parseMoney(newCost)
+          const totalCost = parseMoney(newCost)
           const p = parseMoney(newPrice)
           const incomingQty = parseQuantity(newPurchased, newUnit)
 
-          if (existingItem && c !== null && p !== null && incomingQty !== null) {
+          if (existingItem && totalCost !== null && p !== null && incomingQty !== null && incomingQty > 0) {
+            const incomingUnitCost = Math.round(totalCost * 1000 / incomingQty)
             const currentStock = stockFor(existingItem, state.receipts)
             const currentUnitCost = productCost(existingItem)
             const totalStock = currentStock + incomingQty
             const currentVal = (currentStock / 1000) * currentUnitCost
-            const incomingVal = (incomingQty / 1000) * c
-            const blendedCost = totalStock > 0 ? Math.round((currentVal + incomingVal) / (totalStock / 1000)) : c
+            const incomingVal = totalCost
+            const blendedCost = totalStock > 0 ? Math.round((currentVal + incomingVal) / (totalStock / 1000)) : incomingUnitCost
             const margin = p - blendedCost
             const pct = p > 0 ? (margin / p) * 100 : 0
 
@@ -1185,7 +1189,7 @@ export default function App() {
                 </div>
                 <div>
                   <small>{t('incomingStockLabel')}</small>
-                  <strong>+{quantityWithUnit(incomingQty, newUnit)} @ ৳ {money(c)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
+                  <strong>+{quantityWithUnit(incomingQty, newUnit)} @ ৳ {money(incomingUnitCost)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
                 </div>
                 <div>
                   <small>{t('blendedCostLabel')}</small>
@@ -1203,8 +1207,12 @@ export default function App() {
             </div>
           }
 
-          if (c !== null && p !== null) {
-            const m = p - c
+          const unitCost = (incomingQty !== null && incomingQty > 0 && totalCost !== null)
+            ? Math.round(totalCost * 1000 / incomingQty)
+            : totalCost
+
+          if (unitCost !== null && p !== null) {
+            const m = p - unitCost
             const pct = p > 0 ? (m / p) * 100 : 0
             return <div className="margin-preview">
               <span>{t('unitMargin')}:</span>
