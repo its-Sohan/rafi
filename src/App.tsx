@@ -681,7 +681,7 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        <section className="page-heading"><div><div className="eyebrow"><span className="tiny-cross"/>{t('workspace')}<span className="eyebrow-slash">/</span>0{(['sales', 'inventory', 'accounts', 'reports'] as View[]).indexOf(view) + 1}</div><h1>{t(view)}<span className="heading-dot">.</span></h1><p>{view === 'sales' ? t('welcome') : t(view === 'inventory' ? 'catalogHint' : view === 'accounts' ? 'balanceHint' : 'reportHint')}</p></div><div className="heading-right"><span className="today-summary">{t('today')}<strong>৳ {money(todaySales)}</strong><span> / </span>{todayReceipts.length} {t('receiptsToday').toLowerCase()}</span><div className="heading-date">{now.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' })}<span> / </span>{now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: false })}</div></div></section>
+        <section className="page-heading"><div><div className="eyebrow"><span className="tab-heading-icon"><Icon name={view} size={12}/></span>{t('workspace')}<span className="eyebrow-slash">/</span>0{(['sales', 'inventory', 'accounts', 'reports'] as View[]).indexOf(view) + 1}</div><h1>{t(view)}<span className="heading-dot">.</span></h1><p>{view === 'sales' ? t('welcome') : t(view === 'inventory' ? 'catalogHint' : view === 'accounts' ? 'balanceHint' : 'reportHint')}</p></div><div className="heading-right"><span className="today-summary">{t('today')}<strong>৳ {money(todaySales)}</strong><span> / </span>{todayReceipts.length} {t('receiptsToday').toLowerCase()}</span><div className="heading-date">{now.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' })}<span> / </span>{now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: false })}</div></div></section>
 
         {storageStatus === 'error' && <div className="storage-alert" role="alert">{t('storageError')}<button onClick={exportBackup}>{t('export')} <Icon name="download" size={15}/></button></div>}
 
@@ -842,7 +842,7 @@ export default function App() {
                 </>}
               </div>
             </div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>Status</th><th/></tr></thead><tbody>{catalog.map(p => {
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>Status</th><th/></tr></thead><tbody>{catalog.map(p => {
               const cost = productCost(p)
               const margin = unitMargin(p)
               const marginPct = unitMarginPercent(p)
