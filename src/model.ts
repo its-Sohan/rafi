@@ -8,7 +8,7 @@ export type Product = {
   groupId?: string // Identifier linking variants of the same product (e.g. 'egg', 'soap')
   variantName?: string // Short variant name for inline picker e.g. 'Brown' / 'White'
   variantNameBn?: string // Bengali variant name e.g. 'লাল' / 'সাদা'
-  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner'
+  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily'
   color: string
 }
 export type Line = { productId: string; quantity: number }
@@ -58,19 +58,23 @@ export type ShopState = {
   transactions?: AccountTransaction[]
 }
 export const products: Product[] = [
-  { id: 'rice', code: '101', en: 'Miniket rice', bn: 'মিনিকেট চাল', detail: 'Premium · loose', detailBn: 'প্রিমিয়াম · খোলা', category: 'staples', unit: 'kg', price: 7200, cost: 6200, stock: 125000, purchased: 125000, art: 'rice', color: '#e8e4d8' },
-  { id: 'oil', code: '102', en: 'Soybean oil', bn: 'সয়াবিন তেল', detail: 'Fresh · 1 litre', detailBn: 'ফ্রেশ · ১ লিটার', category: 'staples', unit: 'pc', price: 18000, cost: 16200, stock: 48000, purchased: 48000, art: 'oil', color: '#f4e8b9' },
-  { id: 'egg', code: '103', en: 'Farm eggs', bn: 'ফার্মের ডিম', detail: 'Brown · regular', detailBn: 'লাল · সাধারণ', category: 'fresh', unit: 'pc', price: 1200, cost: 1000, stock: 180000, purchased: 180000, groupId: 'egg', variantName: 'Brown', variantNameBn: 'লাল ডিম', art: 'egg', color: '#f2dfce' },
-  { id: 'egg-white', code: '103W', en: 'Farm eggs', bn: 'ফার্মের ডিম', detail: 'White · regular', detailBn: 'সাদা · সাধারণ', category: 'fresh', unit: 'pc', price: 1100, cost: 950, stock: 120000, purchased: 120000, groupId: 'egg', variantName: 'White', variantNameBn: 'সাদা ডিম', art: 'egg', color: '#fffdfa' },
-  { id: 'milk', code: '104', en: 'Full cream milk', bn: 'ফুল ক্রিম দুধ', detail: 'Milk Vita · 1 litre', detailBn: 'মিল্ক ভিটা · ১ লিটার', category: 'fresh', unit: 'pc', price: 9000, cost: 8000, stock: 24000, purchased: 24000, art: 'milk', color: '#e0e8f0' },
-  { id: 'sugar', code: '105', en: 'White sugar', bn: 'সাদা চিনি', detail: 'Refined · loose', detailBn: 'পরিশোধিত · খোলা', category: 'staples', unit: 'kg', price: 13500, cost: 12000, stock: 65000, purchased: 65000, art: 'sugar', color: '#e6e5ee' },
-  { id: 'tea', code: '106', en: 'Black tea', bn: 'কালো চা', detail: 'Ispahani · 200 g', detailBn: 'ইস্পাহানি · ২০০ গ্রাম', category: 'staples', unit: 'pc', price: 11000, cost: 9500, stock: 32000, purchased: 32000, art: 'tea', color: '#dee9d8' },
-  { id: 'soap', code: '107', en: 'Bath soap', bn: 'গোসলের সাবান', detail: 'Lemon · 100 g', detailBn: 'লেবু · ১০০ গ্রাম', category: 'household', unit: 'pc', price: 4500, cost: 3800, stock: 56000, purchased: 56000, art: 'soap', color: '#e5ebc9' },
-  { id: 'soap-rose', code: '108', en: 'Bath soap', bn: 'গোসলের সাবান', detail: 'Rose · 100 g', detailBn: 'গোলাপ · ১০০ গ্রাম', category: 'household', unit: 'pc', price: 4500, cost: 3800, stock: 38000, purchased: 38000, art: 'soap', color: '#f0dce1' },
-  { id: 'flour', code: '109', en: 'Whole wheat flour', bn: 'লাল আটা', detail: 'Freshly milled · loose', detailBn: 'তাজা · খোলা', category: 'staples', unit: 'kg', price: 6000, cost: 5100, stock: 44000, purchased: 44000, art: 'flour', color: '#eae0cf' },
-  { id: 'lentil', code: '110', en: 'Red lentils', bn: 'মসুর ডাল', detail: 'Fine grain · loose', detailBn: 'ছোট দানা · খোলা', category: 'staples', unit: 'kg', price: 12000, cost: 10500, stock: 38000, purchased: 38000, art: 'lentil', color: '#f0d7c6' },
-  { id: 'biscuit', code: '111', en: 'Butter biscuits', bn: 'বাটার বিস্কুট', detail: 'Olympic · 100 g', detailBn: 'অলিম্পিক · ১০০ গ্রাম', category: 'staples', unit: 'pc', price: 3000, cost: 2500, stock: 18000, purchased: 18000, art: 'biscuit', color: '#eaddba' },
-  { id: 'salt', code: '112', en: 'Iodized salt', bn: 'আয়োডিনযুক্ত লবণ', detail: 'ACI Pure · 1 kg', detailBn: 'এসিআই পিওর · ১ কেজি', category: 'staples', unit: 'pc', price: 4200, cost: 3500, stock: 40000, purchased: 40000, art: 'salt', color: '#d8e8ed' },
+  { id: 'rice', code: '101', en: 'Exercise book', bn: 'এক্সারসাইজ খাতা', detail: '80 pages · ruled', detailBn: '৮০ পৃষ্ঠা · দাগ টানা', category: 'staples', unit: 'pc', price: 7200, cost: 6200, stock: 125000, purchased: 125000, art: 'book', color: '#e8e4d8' },
+  { id: 'oil', code: '102', en: 'Blue ball pen', bn: 'নীল বলপেন', detail: 'Smooth writing · each', detailBn: 'মসৃণ লেখা · প্রতি পিস', category: 'staples', unit: 'pc', price: 1800, cost: 1200, stock: 48000, purchased: 48000, art: 'pen', color: '#e4eaff' },
+  { id: 'egg', code: '103', en: 'HB pencil', bn: 'এইচবি পেন্সিল', detail: 'Wooden · each', detailBn: 'কাঠের · প্রতি পিস', category: 'staples', unit: 'pc', price: 1200, cost: 800, stock: 180000, purchased: 180000, art: 'pencil', color: '#f2dfce' },
+  { id: 'egg-white', code: '103W', en: 'Black ball pen', bn: 'কালো বলপেন', detail: 'Fine tip · each', detailBn: 'সরু নিব · প্রতি পিস', category: 'staples', unit: 'pc', price: 1000, cost: 700, stock: 120000, purchased: 120000, art: 'pen', color: '#fffdfa' },
+  { id: 'milk', code: '104', en: 'Mobile recharge · ৳90', bn: 'মোবাইল রিচার্জ · ৯০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 9000, cost: 8800, stock: 24000, purchased: 24000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'sugar', code: '105', en: 'Class notebook', bn: 'ক্লাসের খাতা', detail: '120 pages · ruled', detailBn: '১২০ পৃষ্ঠা · দাগ টানা', category: 'staples', unit: 'pc', price: 13500, cost: 11500, stock: 65000, purchased: 65000, art: 'notebook', color: '#e6e5ee' },
+  { id: 'tea', code: '106', en: 'Drawing book', bn: 'ড্রয়িং খাতা', detail: 'A4 · 40 sheets', detailBn: 'এ ফোর · ৪০ পাতা', category: 'staples', unit: 'pc', price: 11000, cost: 9000, stock: 32000, purchased: 32000, art: 'book', color: '#dee9d8' },
+  { id: 'soap', code: '107', en: 'Eraser', bn: 'রাবার', detail: 'Soft · each', detailBn: 'নরম · প্রতি পিস', category: 'staples', unit: 'pc', price: 4500, cost: 3000, stock: 56000, purchased: 56000, art: 'daily', color: '#e5ebc9' },
+  { id: 'soap-rose', code: '108', en: 'Pencil sharpener', bn: 'পেন্সিল কাটার', detail: 'Metal blade · each', detailBn: 'ধাতব ব্লেড · প্রতি পিস', category: 'staples', unit: 'pc', price: 4500, cost: 3000, stock: 38000, purchased: 38000, art: 'daily', color: '#f0dce1' },
+  { id: 'flour', code: '109', en: '30 cm ruler', bn: '৩০ সেমি স্কেল', detail: 'Clear plastic · each', detailBn: 'স্বচ্ছ প্লাস্টিক · প্রতি পিস', category: 'staples', unit: 'pc', price: 6000, cost: 4000, stock: 44000, purchased: 44000, art: 'daily', color: '#eae0cf' },
+  { id: 'lentil', code: '110', en: 'Glue stick', bn: 'গ্লু স্টিক', detail: 'Small · each', detailBn: 'ছোট · প্রতি পিস', category: 'staples', unit: 'pc', price: 12000, cost: 9000, stock: 38000, purchased: 38000, art: 'daily', color: '#f0d7c6' },
+  { id: 'biscuit', code: '111', en: 'Potato chips', bn: 'আলুর চিপস', detail: 'Small packet · each', detailBn: 'ছোট প্যাকেট · প্রতি পিস', category: 'household', unit: 'pc', price: 3000, cost: 2200, stock: 18000, purchased: 18000, art: 'snack', color: '#eaddba' },
+  { id: 'salt', code: '112', en: 'Mobile recharge · ৳50', bn: 'মোবাইল রিচার্জ · ৫০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 5000, cost: 4900, stock: 40000, purchased: 40000, art: 'recharge', color: '#d8e8ed' },
+  { id: 'recharge-20', code: '113', en: 'Mobile recharge · ৳20', bn: 'মোবাইল রিচার্জ · ২০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 2000, cost: 1960, stock: 50000, purchased: 50000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'recharge-100', code: '114', en: 'Mobile recharge · ৳100', bn: 'মোবাইল রিচার্জ · ১০০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 10000, cost: 9800, stock: 20000, purchased: 20000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'khata-small', code: '115', en: 'Pocket notebook', bn: 'পকেট নোটবুক', detail: '40 pages · each', detailBn: '৪০ পৃষ্ঠা · প্রতি পিস', category: 'staples', unit: 'pc', price: 2500, cost: 1700, stock: 30000, purchased: 30000, art: 'notebook', color: '#f1e4ca' },
+  { id: 'biscuit-water', code: '116', en: 'Bottled water · 500 ml', bn: 'বোতলজাত পানি · ৫০০ মি.লি.', detail: 'Sealed bottle · each', detailBn: 'সিল করা বোতল · প্রতি পিস', category: 'household', unit: 'pc', price: 2000, cost: 1200, stock: 24000, purchased: 24000, art: 'daily', color: '#d8e8ed' },
 ]
 export const customers: Customer[] = [
   { id: 'c1', en: 'Nadia Rahman', bn: 'নাদিয়া রহমান', phone: '01700 000101', creditLimit: 500000 },

@@ -83,8 +83,11 @@
 .main-content .data-table th{padding:12px var(--panel-inset);font-size:10px}
 .main-content .data-table td{padding:10px var(--panel-inset);font-size:13px;height:var(--row-height)}
 .main-content .data-footnote{padding:10px var(--panel-inset);font-size:10px}
-.main-content .workspace-footer{min-height:34px;margin-top:5px;padding-bottom:0}
-.shortcut-bar{height:40px;padding:0 var(--workspace-gutter)}
+.shortcut-bar{height:32px;padding:0 var(--workspace-gutter);font-size:8px}
+.shortcut-items{gap:10px}
+.shortcut-items>button,.shortcut-hint,.help-trigger{gap:4px;font-size:8px}
+.shortcut-bar kbd{height:17px;min-width:17px;font-size:7.5px;padding:0 3px}
+.help-trigger>svg{margin-left:4px}
 @media(min-width:681px){.main-shell{min-height:640px}}
 @media(max-width:900px){:root{--workspace-gutter:20px;--panel-inset:14px}}
 @media(max-width:680px){
@@ -1239,3 +1242,40 @@
 .dark .variant-table td{border-bottom-color:#38383a;color:#f5f5f7}
 
 @media print{@page{size:80mm auto;margin:5mm}body{background:#fff!important;color:#000!important}.sidebar,.main-shell,.toast,.modal-close,.receipt-dialog-heading,.dialog-actions{display:none!important}.app-shell{min-height:0}.modal-backdrop{position:static;padding:0;background:#fff;display:block;backdrop-filter:none}.modal.dialog-receipt{padding:0;box-shadow:none;border:0;max-height:none;overflow:visible;width:auto;background:#fff}.receipt-paper{border:0;padding:0;width:100%;color:#000}.receipt-paper *{color:#000!important}.receipt-brand .pixel-mark{color:#000!important}.receipt-items,.receipt-total{break-inside:avoid}.receipt-local{font-size:7px}}
+.pixel-mark svg{display:block;width:100%;height:100%;shape-rendering:crispEdges}
+
+/* Light theme secondary text needs stronger contrast on the warm paper surfaces. */
+:root:not(.dark):not([data-theme="dark"]) .eyebrow,
+:root:not(.dark):not([data-theme="dark"]) .page-heading p,
+:root:not(.dark):not([data-theme="dark"]) .heading-date,
+:root:not(.dark):not([data-theme="dark"]) .section-number,
+:root:not(.dark):not([data-theme="dark"]) .panel-heading-meta,
+:root:not(.dark):not([data-theme="dark"]) .product-info>span,
+:root:not(.dark):not([data-theme="dark"]) .product-info code,
+:root:not(.dark):not([data-theme="dark"]) .product-price>span,
+:root:not(.dark):not([data-theme="dark"]) .quantity-placeholder,
+:root:not(.dark):not([data-theme="dark"]) .catalog-footnote,
+:root:not(.dark):not([data-theme="dark"]) .customer-select small,
+:root:not(.dark):not([data-theme="dark"]) .clear-button,
+:root:not(.dark):not([data-theme="dark"]) .footer-brand>span:last-child,
+:root:not(.dark):not([data-theme="dark"]) .today-summary,
+:root:not(.dark):not([data-theme="dark"]) .modal-description,
+:root:not(.dark):not([data-theme="dark"]) .dialog-note,
+:root:not(.dark):not([data-theme="dark"]) .customer-options small,
+:root:not(.dark):not([data-theme="dark"]) .storage-setting p,
+:root:not(.dark):not([data-theme="dark"]) .receipt-meta,
+:root:not(.dark):not([data-theme="dark"]) .receipt-items small,
+:root:not(.dark):not([data-theme="dark"]) .receipt-thanks,
+:root:not(.dark):not([data-theme="dark"]) .receipt-local {
+  color: #62665c;
+}
+
+:root:not(.dark):not([data-theme="dark"]) .product-table-head,
+:root:not(.dark):not([data-theme="dark"]) .bill-table-head,
+:root:not(.dark):not([data-theme="dark"]) .search-box input::placeholder,
+:root:not(.dark):not([data-theme="dark"]) .prototype-label,
+:root:not(.dark):not([data-theme="dark"]) .language-toggle,
+:root:not(.dark):not([data-theme="dark"]) .heading-date>span,
+:root:not(.dark):not([data-theme="dark"]) .section-number {
+  color: #686c62;
+}

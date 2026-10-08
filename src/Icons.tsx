@@ -30,7 +30,11 @@ export function Icon({ name, size = 20 }: { name: string; size?: number }) {
   return <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="square" strokeLinejoin="miter" aria-hidden="true">{paths[name] ?? paths.sales}</svg>
 }
 export function PixelMark({ small = false }: { small?: boolean }) {
-  return <span className={`pixel-mark ${small ? 'small' : ''}`} aria-hidden="true"><i/><i/><i/><i/><i/></span>
+  return <span className={`pixel-mark ${small ? 'small' : ''}`} aria-hidden="true">
+    <svg viewBox="0 0 16 16" shapeRendering="crispEdges" focusable="false">
+      <path fill="currentColor" d="M3 0h10v2h2v14H1V2h2V0Zm0 2v2h10V2H3Zm0 4v2h2V6H3Zm4 0v2h2V6H7Zm4 0v2h2V6h-2ZM3 10v2h2v-2H3Zm4 0v2h2v-2H7Zm4 0v2h2v-2h-2ZM3 14h6v-2H3v2Zm8-2v2h2v-2h-2Z" />
+    </svg>
+  </span>
 }
 export function ProductArt({ product, className = '' }: { product: Product; className?: string }) {
   const art: Record<Product['art'], React.ReactNode> = {
@@ -46,6 +50,13 @@ export function ProductArt({ product, className = '' }: { product: Product; clas
     biscuit: <><path fill="#a67539" d="M3 6h18v15H3z"/><path fill="#d9ba76" d="M5 8h14v11H5z"/><path fill="#f3dfac" d="M8 10h8v2h2v5H6v-5h2z"/><path fill="#b4925c" d="M9 12h2v2H9zm4 2h2v2h-2zm-4 2h2v1H9z"/></>,
     salt: <><path fill="#42889e" d="M5 4h14v3H5zM3 7h18v15H3z"/><path fill="#f0f6f6" d="M5 8h14v12H5z"/><path fill="#71b4c6" d="M5 11h14v6H5z"/><path fill="#fff" d="M8 13h8v2H8z"/></>,
     cleaner: <><path fill="#58796b" d="M9 2h6v4H9z"/><path fill="#72b293" d="M8 6h8v3h2v13H6V9h2z"/><path fill="#f1efde" d="M6 12h12v6H6z"/></>,
+    pencil: <><path fill="#d6a847" d="M10 2h5v16h-5z"/><path fill="#f0d078" d="M11 3h2v14h-2z"/><path fill="#d9b99a" d="m10 18 2.5 4 2.5-4z"/><path fill="#343a44" d="m12.5 22 1-2h-2z"/><path fill="#d86c59" d="M10 2h5v3h-5z"/></>,
+    book: <><path fill="#315e9c" d="M3 2h16v20H3z"/><path fill="#e9edf3" d="M6 4h13v16H6z"/><path fill="#6f8fbd" d="M3 2h3v20H3z"/><path fill="#315e9c" d="M9 8h7v2H9zm0 4h6v1H9z"/></>,
+    notebook: <><path fill="#729262" d="M4 2h16v20H4z"/><path fill="#f1eee0" d="M7 4h13v16H7z"/><path fill="#d9d2bd" d="M4 2h3v20H4z"/><path fill="#8ba77c" d="M9 8h7v1H9zm0 3h8v1H9zm0 3h6v1H9z"/></>,
+    pen: <><path fill="#343f54" d="M10 2h5v16h-5z"/><path fill="#4678c7" d="M11 3h2v13h-2z"/><path fill="#c7cedb" d="M10 18h5l-2.5 4z"/><path fill="#d75b55" d="M10 2h5v3h-5z"/></>,
+    recharge: <><path fill="#3d6fbc" d="M3 2h18v20H3z"/><path fill="#edf2fa" d="M6 5h12v13H6z"/><path fill="#3d6fbc" d="M9 8h6v2H9zm-2 4h3v2H7zm5 0h5v2h-5z"/><path fill="#edc64e" d="M10 17h4v2h-4z"/></>,
+    snack: <><path fill="#d98236" d="M5 3h14v3h2v14H3V6h2z"/><path fill="#f4ce73" d="M6 7h12v10H6z"/><path fill="#ae4f3c" d="M8 10h8v2H8zm2 4h4v1h-4z"/></>,
+    daily: <><path fill="#4a8995" d="M4 4h16v17H4z"/><path fill="#e9f0e7" d="M7 7h10v10H7z"/><path fill="#4a8995" d="M9 9h6v2H9zm0 4h6v2H9z"/></>,
   }
   return <span className={`product-art ${className}`} style={{ '--art-bg': product.color } as CSSProperties}><svg viewBox="0 0 24 24" shapeRendering="crispEdges" aria-hidden="true">{art[product.art]}</svg></span>
 }

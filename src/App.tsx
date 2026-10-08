@@ -934,7 +934,18 @@ export default function App() {
         <footer className="workspace-footer"><span className="footer-brand"><PixelMark small/><span>SMALL SHOP. BIG POSSIBILITIES.</span></span><span className="today-summary">{t('today')}<strong>৳ {money(todaySales)}</strong><span> / </span>{todayReceipts.length} {t('receiptsToday').toLowerCase()}</span></footer>
       </main>
 
-      <div className="shortcut-bar"><div className="shortcut-items"><button onClick={() => { setView('sales'); goSearch() }}><kbd>F2</kbd><span>{t('findItem')}</span></button><span className="shortcut-hint"><kbd>↑</kbd><kbd>↓</kbd><span>{t('navigate')}</span></span><span className="shortcut-hint"><kbd>↵</kbd><span>{t('select')}</span></span><button onClick={() => { setView('sales'); openPayment() }}><kbd>+</kbd><span>{t('pay')}</span></button><button onClick={() => { setQuery(''); goSearch() }}><kbd>esc</kbd><span>{t('back')}</span></button></div><button className="help-trigger" onClick={() => openDialog('shortcuts')}><kbd>?</kbd><span>{t('shortcuts')}</span><Icon name="keyboard" size={18}/></button></div>
+      <div className="shortcut-bar">
+        <div className="shortcut-items">
+          <button onClick={() => { setView('sales'); goSearch() }}><kbd>F2</kbd><span>{t('findItem')}</span></button>
+          <span className="shortcut-hint"><kbd>↑</kbd><kbd>↓</kbd><span>{t('navigate')}</span></span>
+          <span className="shortcut-hint"><kbd>↵</kbd><span>{t('select')}</span></span>
+          <button onClick={() => { setView('sales'); openPayment() }}><kbd>+</kbd><span>{t('pay')}</span></button>
+          <button onClick={() => { setQuery(''); goSearch() }}><kbd>esc</kbd><span>{t('back')}</span></button>
+        </div>
+        <button className="help-trigger" onClick={() => openDialog('shortcuts')}>
+          <kbd>?</kbd><span>{t('shortcuts')}</span><Icon name="keyboard" size={15}/>
+        </button>
+      </div>
     </div>
 
     {toast && <div className="toast" role="status"><Icon name="check" size={16}/><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null) }}>{t('undo')}</button>}<button className="icon-button" aria-label={t('close')} onClick={() => setToast(null)}><Icon name="close" size={13}/></button></div>}
