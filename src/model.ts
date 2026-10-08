@@ -8,6 +8,7 @@ export type Product = {
   groupId?: string // Identifier linking variants of the same product (e.g. 'egg', 'soap')
   variantName?: string // Short variant name for inline picker e.g. 'Brown' / 'White'
   variantNameBn?: string // Bengali variant name e.g. 'লাল' / 'সাদা'
+  archived?: boolean // Discontinued and hidden from the sales catalog
   art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily'
   color: string
 }

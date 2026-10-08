@@ -157,6 +157,12 @@ export default function App() {
 
   const catalog = allProducts(state.customProducts ?? customProducts)
   const findItem = (id: string) => findProductIn(id, catalog)
+  const setProductArchived = (product: Product, archived: boolean) => {
+    const current = state.customProducts ?? customProducts
+    const updated = [...current.filter(item => item.id !== product.id), { ...product, archived }]
+    setState(s => ({ ...s, customProducts: updated }))
+    setToast({ text: archived ? `${product.en} discontinued` : `${product.en} restored to sales` })
+  }
 
   // Provisioning form state
   const [newCode, setNewCode] = useState('')
@@ -180,10 +186,7 @@ export default function App() {
     stock: string
   }
   const [hasVariants, setHasVariants] = useState(false)
-  const [variantRows, setVariantRows] = useState<VariantRow[]>([
-    { id: '1', name: 'Dark', nameBn: 'কালো', code: '', cost: '20.00', price: '25.00', stock: '20' },
-    { id: '2', name: 'Round', nameBn: 'গোল', code: '', cost: '25.00', price: '30.00', stock: '20' },
-  ])
+  const [variantRows, setVariantRows] = useState<VariantRow[]>([])
 
   const openProvisionDialog = () => {
     const nextCode = String(100 + catalog.length + 1)
@@ -197,10 +200,7 @@ export default function App() {
     setNewCost('')
     setNewPurchased('10')
     setHasVariants(false)
-    setVariantRows([
-      { id: '1', name: 'Dark', nameBn: 'কালো', code: `${nextCode}D`, cost: '20.00', price: '25.00', stock: '20' },
-      { id: '2', name: 'Round', nameBn: 'গোল', code: `${nextCode}R`, cost: '25.00', price: '30.00', stock: '20' },
-    ])
+    setVariantRows([])
     setModalError('')
     openDialog('newItem')
   }
@@ -216,11 +216,10 @@ export default function App() {
     }
 
     if (hasVariants) {
-      if (!variantRows.length) {
-        setModalError(t('fillRequired'))
+      if (variantRows.length === 0) {
+        setModalError('Add at least one variant to continue.')
         return
       }
-
       const productsToCreate: Product[] = []
       const groupId = `grp-${Date.now()}-${codeTrim}`
 
@@ -449,12 +448,13 @@ export default function App() {
     if (!p.groupId) return [p]
     return catalog.filter(item => item.groupId === p.groupId)
   }
+  const getSaleVariants = (p: Product): Product[] => getVariants(p).filter(item => !item.archived)
 
   // Deduplicate products that belong to the same groupId in the sales catalog view
   const displayCatalog = (() => {
     const seenGroups = new Set<string>()
     const list: Product[] = []
-    for (const p of catalog) {
+    for (const p of catalog.filter(item => !item.archived)) {
       if (p.groupId) {
         if (!seenGroups.has(p.groupId)) {
           seenGroups.add(p.groupId)
@@ -477,7 +477,7 @@ export default function App() {
       for (let j = receipt.lines.length - 1; j >= 0; j--) {
         const line = receipt.lines[j]
         const found = findItem(line.productId)
-        if (found) {
+        if (found && !found.archived) {
           const groupKey = found.groupId ?? found.id
           if (!seen.has(groupKey)) {
             seen.add(groupKey)
@@ -502,8 +502,8 @@ export default function App() {
     return list
   })()
 
-  const filtered = (category === 'recent' ? recentProducts : displayCatalog.filter(p => category === 'all' || p.category === category)).filter(p => {
-    const variants = getVariants(p)
+  const filtered = (category === 'recent' ? recentProducts : displayCatalog.filter(p => !p.archived && (category === 'all' || p.category === category))).filter(p => {
+    const variants = getVariants(p).filter(v => !v.archived)
     return variants.some(v => `${v.code} ${v.en} ${v.bn} ${v.detail} ${v.detailBn} ${v.variantName ?? ''} ${v.variantNameBn ?? ''}`.toLowerCase().includes(query.toLowerCase().trim()))
   })
 
@@ -530,7 +530,7 @@ export default function App() {
   const notify = (key: CopyKey) => setToast({ text: t(key) })
   const chooseProduct = (product: Product) => {
     setQuantityProduct(product)
-    const variants = getVariants(product)
+    const variants = getSaleVariants(product)
     setSelectedVariant(variants[0] ?? product)
     setQty('1')
     setInputError('')
@@ -685,7 +685,7 @@ export default function App() {
             </div>
             <div className={`quantity-lane ${quantityProduct ? 'active' : ''}`}>
               {quantityProduct ? (() => {
-                const variants = getVariants(quantityProduct)
+                const variants = getSaleVariants(quantityProduct)
                 const currentVariant = selectedVariant ?? variants[0] ?? quantityProduct
                 const hasVariants = variants.length > 1
 
@@ -817,12 +817,12 @@ export default function App() {
                 </>}
               </div>
             </div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th></tr></thead><tbody>{catalog.map(p => {
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>Status</th><th/></tr></thead><tbody>{catalog.map(p => {
               const cost = productCost(p)
               const margin = unitMargin(p)
               const marginPct = unitMarginPercent(p)
               const purchased = p.purchased ?? p.stock
-              return <tr key={p.id}>
+              return <tr key={p.id} className={p.archived ? 'product-discontinued' : undefined}>
                 <td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td>
                 <td><code>{p.code}</code></td>
                 <td>{quantityText(stockFor(p, state.receipts))} <small>{p.unit}</small></td>
@@ -830,6 +830,8 @@ export default function App() {
                 <td>৳ {money(p.price)}</td>
                 <td><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
                 <td>{quantityText(purchased)} <small>{p.unit}</small></td>
+                <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{p.archived ? 'Discontinued' : 'Active'}</span></td>
+                <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{p.archived ? 'Restore' : 'Discontinue'}</button></td>
               </tr>
             })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th>{t('totalDue')}</th><th>{t('loan')}</th><th>{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
               const b = customerBalance(c, state.receipts, state.transactions)
@@ -1055,12 +1057,16 @@ export default function App() {
           <div className="variant-builder-wrap">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="eyebrow">{t('variantBreakdown')} ({variantRows.length})</span>
-              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Configure individual cost, price, and stock for each variant</small>
+              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Set a name, code, cost, selling price, and opening stock for each variant.</small>
+            </div>
+            <div className="variant-builder-head" aria-hidden="true">
+              <span>Variant name</span><span>Code</span><span>Cost (৳)</span><span>Selling price (৳)</span><span>Opening stock ({newUnit})</span><span />
             </div>
             {variantRows.map((vRow, idx) => (
               <div key={vRow.id} className="variant-builder-row">
                 <input
-                  placeholder="Variant (e.g. Dark, Round)"
+                  aria-label={`Variant name, row ${idx + 1}`}
+                  placeholder="e.g. 500 g, Blue"
                   value={vRow.name}
                   onChange={e => {
                     const next = [...variantRows]
@@ -1070,7 +1076,8 @@ export default function App() {
                   required
                 />
                 <input
-                  placeholder="Code (optional)"
+                  aria-label={`Variant code, row ${idx + 1} (optional)`}
+                  placeholder="Optional"
                   value={vRow.code}
                   onChange={e => {
                     const next = [...variantRows]
@@ -1079,7 +1086,8 @@ export default function App() {
                   }}
                 />
                 <input
-                  placeholder="Cost ৳"
+                  aria-label={`Cost in taka, row ${idx + 1}`}
+                  placeholder="0.00"
                   inputMode="decimal"
                   value={vRow.cost}
                   onChange={e => {
@@ -1090,7 +1098,8 @@ export default function App() {
                   required
                 />
                 <input
-                  placeholder="Price ৳"
+                  aria-label={`Selling price in taka, row ${idx + 1}`}
+                  placeholder="0.00"
                   inputMode="decimal"
                   value={vRow.price}
                   onChange={e => {
@@ -1101,7 +1110,8 @@ export default function App() {
                   required
                 />
                 <input
-                  placeholder={`Stock (${newUnit})`}
+                  aria-label={`Opening stock in ${newUnit}, row ${idx + 1}`}
+                  placeholder="0"
                   inputMode="decimal"
                   value={vRow.stock}
                   onChange={e => {
@@ -1128,10 +1138,9 @@ export default function App() {
               className="add-variant-btn"
               onClick={() => {
                 const nextId = String(Date.now())
-                const defaultLabel = variantRows.length === 0 ? 'Dark' : variantRows.length === 1 ? 'Round' : `Variant ${variantRows.length + 1}`
                 setVariantRows([
                   ...variantRows,
-                  { id: nextId, name: defaultLabel, nameBn: defaultLabel, code: `${newCode}-${variantRows.length + 1}`, cost: '20.00', price: '25.00', stock: '20' }
+                  { id: nextId, name: '', nameBn: '', code: '', cost: '', price: '', stock: '' }
                 ])
               }}
             >
