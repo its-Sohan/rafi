@@ -1988,10 +1988,8 @@
 }
 
 .shortcut-bar.shortcut-toast{
-  position:fixed;
-  left:calc(50% + 44px);
-  bottom:70px;
-  transform:translateX(-50%);
+  position:relative;
+  margin:0 auto calc(8px + env(safe-area-inset-bottom, 0px));
   width:max-content;
   max-width:calc(100vw - 110px);
   min-height:0;
@@ -2005,8 +2003,7 @@
   background:var(--white);
 }
 .shortcut-toast .shortcut-items{flex-wrap:wrap}
-@media(max-width:1200px){.shortcut-bar.shortcut-toast{left:calc(50% + 36px)}}
 @media(max-width:680px){
-  .shortcut-bar.shortcut-toast{left:calc(50% + 27px);bottom:60px;padding:9px 11px;gap:8px}
+  .shortcut-bar.shortcut-toast{padding:9px 11px;gap:8px}
   .shortcut-toast .shortcut-items{flex-shrink:1}
 }

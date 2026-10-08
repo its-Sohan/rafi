@@ -100,7 +100,7 @@ function Modal({ children, title, onClose, className = '', canClose = true }: { 
   return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && canClose) onClose() }}>
     <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`modal ${className}`}>
       <h2 id={titleId} className="sr-only">{title}</h2>
-      <button className="modal-close icon-button" aria-label="Close / বন্ধ করুন" onClick={onClose} disabled={!canClose}><Icon name="close"/></button>
+      <button className="modal-close icon-button" aria-label="Close" onClick={onClose} disabled={!canClose}><Icon name="close"/></button>
       {children}
     </div>
   </div>
@@ -653,7 +653,7 @@ export default function App() {
   return <div ref={motionRoot} className={`app-shell lang-${lang}`}>
     <aside className="sidebar" aria-label="Main navigation">
       <button className="brand-mark" aria-label="Hisab sales counter" onClick={() => setView('sales')}><PixelMark/></button>
-      <div className="side-nav">{(['sales', 'inventory', 'accounts', 'reports'] as View[]).map((item, index) => <button key={item} className={`nav-button ${view === item ? 'active' : ''}`} onClick={() => setView(item)} aria-label={t(item)} aria-current={view === item ? 'page' : undefined} title={t(item)}><Icon name={item} size={23}/><span>{lang === 'en' && item === 'sales' ? 'Counter' : t(item)}</span><i className="nav-index">0{index + 1}</i></button>)}</div>
+      <div className="side-nav">{(['sales', 'inventory', 'accounts', 'reports'] as View[]).map((item, index) => <button key={item} className={`nav-button ${view === item ? 'active' : ''}`} onClick={() => setView(item)} aria-label={t(item)} aria-current={view === item ? 'page' : undefined} title={t(item)}><Icon name={item} size={23}/><span>{t(item)}</span><i className="nav-index">0{index + 1}</i></button>)}</div>
       <div className="side-bottom"><button className="nav-button" onClick={() => openDialog('shortcuts')} title={t('shortcuts')} aria-label={t('shortcuts')}><Icon name="keyboard" size={22}/></button><button className="nav-button" onClick={() => openDialog('settings')} title={t('settings')} aria-label={t('settings')}><Icon name="settings" size={22}/></button><div className="avatar" aria-label="Shop owner">S</div></div>
     </aside>
 
@@ -749,7 +749,7 @@ export default function App() {
                       )}
                     </div>
                     {hasVariants && (
-                      <div className="variant-nav-hint" title="Use arrow keys to change variant">
+                      <div className="variant-nav-hint" title={t('selectVariant')}>
                         <kbd>←</kbd><kbd>→</kbd><span>{t('variants')}</span>
                       </div>
                     )}
@@ -773,7 +773,6 @@ export default function App() {
               })() : <div className="quantity-placeholder"><Icon name="keyboard" size={18}/><span>{t('itemHint')}</span><kbd>↵</kbd></div>}
               {inputError && <p id="qty-error" className="field-error" role="alert">{inputError}</p>}
             </div>
-            <div className="catalog-footnote"><span className="pixel-dot"/>{t('noBackend')}</div>
           </section>
 
           <section className="panel bill-panel" aria-labelledby="bill-heading">
@@ -842,7 +841,7 @@ export default function App() {
                 </>}
               </div>
             </div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>Status</th><th/></tr></thead><tbody>{catalog.map(p => {
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{catalog.map(p => {
               const cost = productCost(p)
               const margin = unitMargin(p)
               const marginPct = unitMarginPercent(p)
@@ -855,8 +854,8 @@ export default function App() {
                 <td>৳ {money(p.price)}</td>
                 <td><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
                 <td>{quantityWithUnit(purchased, p.unit)}</td>
-                <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{p.archived ? 'Discontinued' : 'Active'}</span></td>
-                <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{p.archived ? 'Restore' : 'Discontinue'}</button></td>
+                <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{t(p.archived ? 'statusInactive' : 'statusActive')}</span></td>
+                <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{t(p.archived ? 'actionTurnOn' : 'actionTurnOff')}</button></td>
               </tr>
             })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th>{t('totalDue')}</th><th>{t('loan')}</th><th>{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
               const b = customerBalance(c, state.receipts, state.transactions)
@@ -992,9 +991,9 @@ export default function App() {
 
       {dialog === 'clear' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('clearTitle')}</h3><p className="modal-description">{t('clearHint')}</p><div className="dialog-actions"><button className="secondary-button" data-initial-focus onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" onClick={() => { setState(s => ({ ...s, lines: [], discount: 0, customerId: null })); closeDialog(); goSearch() }}>{t('confirmClear')}</button></div></>}
 
-      {dialog === 'shortcuts' && <><div className="eyebrow modal-eyebrow"><Icon name="keyboard" size={17}/> HISAB / KEYS</div><h3>{t('shortcutTitle')}</h3><p className="modal-description">{t('shortcutHint')}</p><div className="shortcut-guide">{([['F2', 'focusSearch'], ['↑  ↓', 'navigate'], ['Enter', 'select'], ['+', 'openPayment'], ['Alt + B', 'billFocus'], ['Enter', 'editBill'], ['Delete', 'removeBill'], ['Esc', 'closeDialog'], ['?', 'showHelp']] as [string, CopyKey][]).map(([key, label]) => <div key={label}><span>{t(label)}</span><kbd>{key}</kbd></div>)}</div><p className="dialog-note">{t('shortcutsNote')}</p></>}
+      {dialog === 'shortcuts' && <><div className="eyebrow modal-eyebrow"><Icon name="keyboard" size={17}/> HISAB / SHORTCUTS</div><h3>{t('shortcutTitle')}</h3><p className="modal-description">{t('shortcutHint')}</p><div className="shortcut-guide">{([['F2', 'focusSearch'], ['↑  ↓', 'navigate'], ['Enter', 'select'], ['+', 'openPayment'], ['Alt + B', 'billFocus'], ['Enter', 'editBill'], ['Delete', 'removeBill'], ['Esc', 'closeDialog'], ['?', 'showHelp']] as [string, CopyKey][]).map(([key, label]) => <div key={label}><span>{t(label)}</span><kbd>{key}</kbd></div>)}</div><p className="dialog-note">{t('shortcutsNote')}</p></>}
 
-      {dialog === 'settings' && <><div className="eyebrow modal-eyebrow">HISAB / PREFERENCES</div><h3>{t('settings')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('settingsHint')}</p><div className="setting-row"><span>{t('language')}</span><div className="setting-language"><button onClick={() => setLang('en')} className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'}>English</button><button onClick={() => setLang('bn')} className={lang === 'bn' ? 'active' : ''} aria-pressed={lang === 'bn'}>বাংলা</button></div></div><div className="setting-row"><span>{t('appearance')}</span><div className="setting-language"><button onClick={() => setTheme('light')} className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'}>{t('light')}</button><button onClick={() => setTheme('dark')} className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'}>{t('dark')}</button></div></div><div className="setting-row"><span>{t('offlineAccess')}</span><span className={`offline-status ${offlineStatus}`} role="status">{t(offlineStatus === 'ready' ? 'offlineReady' : offlineStatus === 'preparing' ? 'offlinePreparing' : offlineStatus === 'development' ? 'offlineDevelopment' : 'offlineUnavailable')}</span></div><div className="storage-setting"><h4>{t('storage')}</h4><p>{t('storageHint')}</p><button className="secondary-button" onClick={exportBackup}><Icon name="download" size={16}/>{t('export')}</button></div><p className="dialog-note">{t('version')}</p></>}
+      {dialog === 'settings' && <><div className="eyebrow modal-eyebrow">HISAB / SETTINGS</div><h3>{t('settings')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('settingsHint')}</p><div className="setting-row"><span>{t('language')}</span><div className="setting-language"><button onClick={() => setLang('en')} className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'}>English</button><button onClick={() => setLang('bn')} className={lang === 'bn' ? 'active' : ''} aria-pressed={lang === 'bn'}>বাংলা</button></div></div><div className="setting-row"><span>{t('appearance')}</span><div className="setting-language"><button onClick={() => setTheme('light')} className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'}>{t('light')}</button><button onClick={() => setTheme('dark')} className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'}>{t('dark')}</button></div></div><div className="setting-row"><span>{t('offlineAccess')}</span><span className={`offline-status ${offlineStatus}`} role="status">{t(offlineStatus === 'ready' ? 'offlineReady' : offlineStatus === 'preparing' ? 'offlinePreparing' : offlineStatus === 'development' ? 'offlineDevelopment' : 'offlineUnavailable')}</span></div><div className="storage-setting"><h4>{t('storage')}</h4><p>{t('storageHint')}</p><button className="secondary-button" onClick={exportBackup}><Icon name="download" size={16}/>{t('export')}</button></div><p className="dialog-note">{t('version')}</p></>}
 
       {dialog === 'newItem' && <form onSubmit={e => { e.preventDefault(); createProduct() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('inventory')}</div><h3>{t('newItem')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newItemHint')}</p>
         <div className="variant-toggle-row">
@@ -1058,9 +1057,9 @@ export default function App() {
             <label htmlFor="item-unit">{t('unitLabel')}</label>
             <select id="item-unit" className="form-input" value={newUnit} onChange={e => setNewUnit(e.target.value as Product['unit'])}>
               <option value="kg">kg (Kilogram)</option>
-              <option value="pc">pc (Piece / Packet)</option>
+              <option value="pc">pc (Piece)</option>
               <option value="L">L (Litre)</option>
-              <option value="BDT">৳ BDT (Recharge / monetary service)</option>
+              <option value="BDT">৳ BDT (Recharge)</option>
             </select>
           </div>
           {!hasVariants && (
@@ -1085,10 +1084,10 @@ export default function App() {
           <div className="variant-builder-wrap">
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span className="eyebrow">{t('variantBreakdown')} ({variantRows.length})</span>
-              <small style={{ color: 'var(--muted)', fontSize: 10 }}>Set a name, code, total purchase amount, selling price, and opening stock for each variant.</small>
+              <small style={{ color: 'var(--muted)', fontSize: 10 }}>{t('variantHint')}</small>
             </div>
             <div className={`variant-builder-head${variantRows.length > 1 ? ' has-remove' : ''}`} aria-hidden="true">
-              <span>Variant name</span><span>Code</span><span>Purchase amount (৳)</span><span>Selling price (৳)</span><span>Opening stock ({newUnit})</span><span />
+              <span>{t('variant')}</span><span>{t('code')}</span><span>{t('purchaseAmount')} (৳)</span><span>{t('sellingPrice')} (৳)</span><span>{t('stock')} ({newUnit})</span><span />
             </div>
             {variantRows.map((vRow, idx) => (
               <div key={vRow.id} className={`variant-builder-row${variantRows.length > 1 ? ' has-remove' : ''}`}>
@@ -1273,7 +1272,7 @@ export default function App() {
         {modalError && <p className="field-error" role="alert">{modalError}</p>}
         <div className="dialog-actions">
           <button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button>
-          <button className="primary-button" type="submit">{t('saveItem')}<kbd>↵</kbd></button>
+          <button className="primary-button" type="submit">{t('saveCustomer')}<kbd>↵</kbd></button>
         </div>
       </form>}
 
@@ -1326,7 +1325,7 @@ export default function App() {
                   <th>{t('time')}</th>
                   <th>{t('typeLabel')}</th>
                   <th>{t('amount')}</th>
-                  <th>{t('productDetail')}</th>
+                  <th>{t('txNoteLabel')}</th>
                 </tr>
               </thead>
               <tbody>
@@ -1586,7 +1585,7 @@ export default function App() {
         </div>
 
         <div className="form-group" style={{ marginTop: 15 }}>
-          <label htmlFor="tx-note">{t('productDetail')}</label>
+          <label htmlFor="tx-note">{t('txNoteLabel')}</label>
           <input id="tx-note" className="form-input" value={txNote} onChange={e => setTxNote(e.target.value)} placeholder="e.g. Cash payment / Eid advance"/>
         </div>
 
