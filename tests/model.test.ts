@@ -314,3 +314,88 @@ test('multi-variant custom products deduplicate in display catalog and match by 
   const archivedSearch = searchCatalog(archivedCatalog, '501', 'all', [])
   assert.equal(archivedSearch.some(p => p.groupId === groupId), false)
 })
+
+test('sales counter search algorithm matches products accurately even with typos, compound words, and Bengali numerals', () => {
+  const catalog = allProducts()
+
+  // 1. English letter transposition & missing/extra letters
+  const exersiseSearch = searchCatalog(catalog, 'exersise')
+  assert.ok(exersiseSearch.length > 0)
+  assert.equal(exersiseSearch[0].id, 'rice') // Exercise book
+
+  const notebokSearch = searchCatalog(catalog, 'notebok')
+  assert.ok(notebokSearch.length > 0)
+  assert.ok(['sugar', 'khata-small'].includes(notebokSearch[0].id)) // Class notebook / Pocket notebook
+
+  const shaprnerSearch = searchCatalog(catalog, 'shaprner')
+  assert.ok(shaprnerSearch.length > 0)
+  assert.equal(shaprnerSearch[0].id, 'soap-rose') // Pencil sharpener
+
+  const potattoSearch = searchCatalog(catalog, 'potatto')
+  assert.ok(potattoSearch.length > 0)
+  assert.equal(potattoSearch[0].id, 'biscuit') // Potato chips
+
+  const chpisSearch = searchCatalog(catalog, 'chpis')
+  assert.ok(chpisSearch.length > 0)
+  assert.equal(chpisSearch[0].id, 'biscuit') // Potato chips
+
+  const erazerSearch = searchCatalog(catalog, 'erazer')
+  assert.ok(erazerSearch.length > 0)
+  assert.equal(erazerSearch[0].id, 'soap') // Eraser
+
+  const elctricitySearch = searchCatalog(catalog, 'elctricity')
+  assert.ok(elctricitySearch.length > 0)
+  assert.equal(elctricitySearch[0].id, 'salt') // Electricity meter top-up
+
+  // 2. Bengali numerals (১০১ -> 101, ১০৩ -> 103)
+  const bnNumSearch = searchCatalog(catalog, '১০১')
+  assert.equal(bnNumSearch.length, 1)
+  assert.equal(bnNumSearch[0].id, 'rice') // code 101
+
+  const bnNum103Search = searchCatalog(catalog, '১০৩')
+  assert.ok(bnNum103Search.length >= 2)
+  assert.equal(bnNum103Search[0].id, 'egg') // code 103
+
+  // 3. Spacing, hyphens & compound words (ballpen, 30cm, 500ml, topup)
+  const ballpenSearch = searchCatalog(catalog, 'ballpen')
+  assert.ok(ballpenSearch.length >= 2)
+  assert.ok(['oil', 'egg-white'].includes(ballpenSearch[0].id))
+
+  const cm30Search = searchCatalog(catalog, '30cm')
+  assert.equal(cm30Search.length, 1)
+  assert.equal(cm30Search[0].id, 'flour') // 30 cm ruler
+
+  const ml500Search = searchCatalog(catalog, '500ml')
+  assert.equal(ml500Search.length, 1)
+  assert.equal(ml500Search[0].id, 'biscuit-water') // Bottled water · 500 ml
+
+  const topupSearch = searchCatalog(catalog, 'topup')
+  assert.ok(topupSearch.length > 0)
+  assert.equal(topupSearch[0].id, 'salt') // Electricity meter top-up
+
+  // 4. Word-order independent multi-token search
+  const orderSearch1 = searchCatalog(catalog, 'blu pen')
+  assert.equal(orderSearch1[0].id, 'oil') // Blue ball pen
+
+  const orderSearch2 = searchCatalog(catalog, 'pen blue')
+  assert.equal(orderSearch2[0].id, 'oil') // Blue ball pen
+
+  const orderSearch3 = searchCatalog(catalog, 'pocket note')
+  assert.equal(orderSearch3[0].id, 'khata-small') // Pocket notebook
+
+  // 5. Bengali script searches & Banglish phonetic synonyms
+  const bnTypoSearch = searchCatalog(catalog, 'পেনসিল') // typo for পেন্সিল
+  assert.ok(bnTypoSearch.length >= 2)
+  assert.ok(['egg', 'soap-rose'].includes(bnTypoSearch[0].id))
+
+  const khataSearch = searchCatalog(catalog, 'khata')
+  assert.ok(khataSearch.length >= 3)
+  assert.ok(['rice', 'sugar', 'tea', 'khata-small'].includes(khataSearch[0].id))
+
+  const boiSearch = searchCatalog(catalog, 'বই')
+  assert.ok(boiSearch.length >= 2)
+
+  // 6. Completely unrelated string returns empty array
+  assert.equal(searchCatalog(catalog, 'xyz987completelynonexistent').length, 0)
+})
+

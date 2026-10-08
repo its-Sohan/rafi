@@ -122,34 +122,324 @@ export function displayCatalogProducts(catalog: Product[] = products): Product[]
   return list
 }
 
+const BENGALI_DIGITS = '০১২৩৪৫৬৭৮৯'
+
+export function normalizeBengaliDigits(text: string): string {
+  return text.replace(/[০-৯]/g, ch => String(BENGALI_DIGITS.indexOf(ch)))
+}
+
+export function cleanSearchText(text: string): string {
+  return normalizeBengaliDigits(text || '')
+    .toLowerCase()
+    .normalize('NFC')
+    .replace(/[\u200B-\u200D\uFEFF]/g, '')
+}
+
+export function damerauLevenshtein(a: string, b: string): number {
+  if (a === b) return 0
+  const la = a.length
+  const lb = b.length
+  if (la === 0) return lb
+  if (lb === 0) return la
+
+  const lenDiff = Math.abs(la - lb)
+  if (lenDiff > 3) return lenDiff
+
+  const dp: number[][] = []
+  for (let i = 0; i <= la; i++) {
+    dp[i] = new Array(lb + 1)
+    dp[i][0] = i
+  }
+  for (let j = 0; j <= lb; j++) {
+    dp[0][j] = j
+  }
+
+  for (let i = 1; i <= la; i++) {
+    const ca = a.charCodeAt(i - 1)
+    for (let j = 1; j <= lb; j++) {
+      const cb = b.charCodeAt(j - 1)
+      const cost = ca === cb ? 0 : 1
+      let dist = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + cost
+      )
+      if (i > 1 && j > 1 && ca === b.charCodeAt(j - 2) && a.charCodeAt(i - 2) === cb) {
+        dist = Math.min(dist, dp[i - 2][j - 2] + 1)
+      }
+      dp[i][j] = dist
+    }
+  }
+
+  return dp[la][lb]
+}
+
+const PHONETIC_SYNONYMS: Record<string, string[]> = {
+  // Stationery
+  'খাতা': ['khata', 'kata', 'notebook', 'book', 'exercise'],
+  'বই': ['boi', 'book'],
+  'কলম': ['kolom', 'kalam', 'pen', 'ballpen'],
+  'পেন্সিল': ['pencil', 'pensil', 'pencl'],
+  'কাটার': ['sharpener', 'katar', 'sharpner'],
+  'রাবার': ['eraser', 'rabar', 'raber', 'rubber'],
+  'স্কেল': ['scale', 'skel', 'ruler'],
+  'গ্লু': ['glue', 'glu', 'stick'],
+  'ড্রয়িং': ['drawing', 'draw', 'art'],
+  // Grocery & Daily
+  'আলু': ['alu', 'potato'],
+  'চিপস': ['chips', 'cipsh', 'crisps'],
+  'পানি': ['pani', 'water'],
+  'বোতল': ['botol', 'bottle'],
+  'রিচার্জ': ['recharge', 'ricarj', 'recharj', 'topup'],
+  'বিদ্যুৎ': ['electricity', 'biddut', 'bidyut', 'meter', 'prepaid'],
+  'ইন্টারনেট': ['internet', 'data', 'broadband', 'wifi'],
+  'টিভি': ['tv', 'television', 'dth', 'cable'],
+  'টপ-আপ': ['topup', 'top-up', 'recharge'],
+  'টপআপ': ['topup', 'top-up', 'recharge'],
+  'চাল': ['chal', 'rice'],
+  'তেল': ['tel', 'oil'],
+  'ডিম': ['dim', 'egg'],
+  'চিনি': ['chini', 'sugar'],
+  'চা': ['cha', 'tea'],
+  'সাবান': ['soap', 'shaban', 'sabun'],
+  'আটা': ['flour', 'ata'],
+  'ময়দা': ['flour', 'moyda'],
+  'ডাল': ['lentil', 'dal', 'daal'],
+  'লবণ': ['salt', 'lobon', 'laban'],
+  'দুধ': ['milk', 'dudh'],
+  'বিস্কুট': ['biscuit', 'biskut'],
+  'আম': ['mango', 'aam'],
+}
+
+function extractTokens(text?: string): string[] {
+  if (!text) return []
+  const cleaned = cleanSearchText(text)
+  const rawTokens = cleaned.split(/[\s\-_\.,/:;()·#+*&|~'"!?]+/).filter(Boolean)
+  const result = new Set(rawTokens)
+  for (const t of rawTokens) {
+    const parts = t.match(/([0-9]+|[a-z]+|[\u0980-\u09ff]+)/gi)
+    if (parts && parts.length > 1) {
+      for (const p of parts) result.add(p)
+    }
+  }
+  return [...result]
+}
+
+function scoreTokenMatch(qToken: string, tToken: string): number {
+  if (qToken === tToken) return 100
+
+  const qIsDigits = /^\d+$/.test(qToken)
+  const tIsDigits = /^\d+$/.test(tToken)
+
+  if (qIsDigits && tIsDigits) {
+    if (tToken.startsWith(qToken)) {
+      return 75 + Math.round(25 * (qToken.length / tToken.length))
+    }
+    return 0
+  }
+
+  if (tToken.startsWith(qToken)) {
+    return 70 + Math.round(25 * (qToken.length / tToken.length))
+  }
+  if (tToken.includes(qToken) && qToken.length >= 2) {
+    return 55
+  }
+  if (tToken.endsWith(qToken) && qToken.length >= 3) {
+    return 60
+  }
+
+  // Fuzzy match (for text/words)
+  const qLen = qToken.length
+  const tLen = tToken.length
+  if (qLen < 3) return 0
+  if (qIsDigits || tIsDigits) return 0
+
+  const maxDist = qLen <= 4 ? 1 : qLen <= 7 ? 2 : 2
+  const d = damerauLevenshtein(qToken, tToken)
+  if (d <= maxDist) {
+    const similarity = 1 - d / Math.max(qLen, tLen)
+    return Math.round(75 * similarity)
+  }
+
+  // Fuzzy match against prefix of target token
+  if (qLen >= 4 && tLen > qLen) {
+    const tPrefix = tToken.slice(0, qLen)
+    if (damerauLevenshtein(qToken, tPrefix) <= 1) {
+      return 50
+    }
+  }
+
+  return 0
+}
+
+function getSynonymsForTokens(tokens: string[]): string[] {
+  const syns = new Set<string>()
+  for (const t of tokens) {
+    if (!t || t.length < 2) continue
+    const direct = PHONETIC_SYNONYMS[t]
+    if (direct) {
+      for (const s of direct) syns.add(s)
+    }
+    for (const [key, list] of Object.entries(PHONETIC_SYNONYMS)) {
+      if (list.includes(t)) {
+        syns.add(key)
+        for (const s of list) syns.add(s)
+      }
+    }
+  }
+  return [...syns]
+}
+
+export function scoreProductVariant(
+  v: Product,
+  query: string,
+  compactQuery?: string,
+  queryTokens?: string[]
+): number {
+  const cleanQ = cleanSearchText(query).trim()
+  const compactQ = compactQuery ?? cleanQ.replace(/[\s\-_\.,/:;()·#+*&|~'"!?]+/g, '')
+  const qTokens = queryTokens ?? cleanQ.split(/[\s\-_\.,/:;()·#+*&|~'"!?]+/).filter(Boolean)
+
+  if (!cleanQ) return 0
+
+  const code = cleanSearchText(v.code)
+  const baseCode = cleanSearchText(v.groupId ? v.groupId.replace(/^grp-\d+-/, '') : '')
+  const compactCode = code.replace(/[\s\-]/g, '')
+  const compactBaseCode = baseCode.replace(/[\s\-]/g, '')
+  const isPureDigits = /^\d+$/.test(compactQ)
+
+  let score = 0
+
+  // 1. Code match boosts
+  if (compactQ === compactCode || (compactBaseCode && compactQ === compactBaseCode)) {
+    score += 3000
+  } else if (compactCode.startsWith(compactQ) || (compactBaseCode && compactBaseCode.startsWith(compactQ))) {
+    score += 1500
+  } else if (!isPureDigits && (compactCode.includes(compactQ) || (compactBaseCode && compactBaseCode.includes(compactQ)))) {
+    score += 600
+  } else if (!isPureDigits && compactQ.length >= 3 && (damerauLevenshtein(compactQ, compactCode) <= 1 || (compactBaseCode && damerauLevenshtein(compactQ, compactBaseCode) <= 1))) {
+    score += 500
+  }
+
+  // 2. Full phrase / Name match
+  const enClean = cleanSearchText(v.en)
+  const bnClean = cleanSearchText(v.bn)
+  const enCompact = enClean.replace(/[\s\-]/g, '')
+  const bnCompact = bnClean.replace(/[\s\-]/g, '')
+
+  if (enCompact === compactQ || bnCompact === compactQ) {
+    score += 2000
+  } else if (enClean.startsWith(cleanQ) || bnClean.startsWith(cleanQ)) {
+    score += 1200
+  } else if (enCompact.startsWith(compactQ) || bnCompact.startsWith(compactQ)) {
+    score += 1000
+  } else if (enCompact.includes(compactQ) || bnCompact.includes(compactQ)) {
+    score += 700
+  }
+
+  // 3. Token-based matching
+  const primaryTokens = [
+    ...extractTokens(v.en),
+    ...extractTokens(v.bn),
+    ...extractTokens(v.variantName),
+    ...extractTokens(v.variantNameBn),
+    ...extractTokens(v.code),
+    ...extractTokens(baseCode),
+  ]
+  const secondaryTokens = [
+    ...extractTokens(v.detail),
+    ...extractTokens(v.detailBn),
+    ...extractTokens(v.id),
+    ...extractTokens(v.category),
+  ]
+  const synTokens = getSynonymsForTokens([...primaryTokens, ...secondaryTokens])
+
+  // Compound check: e.g. ballpen matching [ball, pen]
+  for (let i = 0; i < primaryTokens.length - 1; i++) {
+    const pair = primaryTokens[i] + primaryTokens[i + 1]
+    if (pair === compactQ) {
+      score += 900
+      break
+    }
+  }
+
+  if (qTokens.length === 0) return score
+
+  let matchedCount = 0
+  let tokenScoreSum = 0
+
+  for (const qToken of qTokens) {
+    let best = 0
+    for (const pt of primaryTokens) {
+      best = Math.max(best, scoreTokenMatch(qToken, pt) * 2.0)
+    }
+    for (const st of synTokens) {
+      best = Math.max(best, scoreTokenMatch(qToken, st) * 1.6)
+    }
+    for (const st of secondaryTokens) {
+      best = Math.max(best, scoreTokenMatch(qToken, st) * 1.0)
+    }
+
+    if (best >= 40) {
+      matchedCount++
+      tokenScoreSum += best
+    }
+  }
+
+  if (qTokens.length === 1) {
+    score += tokenScoreSum
+  } else {
+    if (matchedCount === qTokens.length) {
+      score += tokenScoreSum + 600
+    } else if (matchedCount >= Math.ceil(qTokens.length * 0.6)) {
+      score += Math.round(tokenScoreSum * (matchedCount / qTokens.length))
+    }
+  }
+
+  return score
+}
+
 export function searchCatalog(
   catalog: Product[] = products,
   query: string = '',
   category: Category = 'recent',
   recentProducts: Product[] = []
 ): Product[] {
-  const trimmed = query.trim().toLowerCase()
+  const cleanQ = cleanSearchText(query).trim()
   const displayList = displayCatalogProducts(catalog)
 
-  const pool = trimmed
-    ? displayList
-    : (category === 'recent'
-        ? recentProducts
-        : displayList.filter(p => category === 'all' || p.category === category))
-
-  if (!trimmed) {
-    return pool
+  if (!cleanQ) {
+    return category === 'recent'
+      ? recentProducts
+      : displayList.filter(p => category === 'all' || p.category === category)
   }
 
-  return pool.filter(p => {
+  const compactQ = cleanQ.replace(/[\s\-_\.,/:;()·#+*&|~'"!?]+/g, '')
+  const queryTokens = cleanQ.split(/[\s\-_\.,/:;()·#+*&|~'"!?]+/).filter(Boolean)
+
+  const scoredList: { product: Product; score: number }[] = []
+  for (const p of displayList) {
     const variants = getProductVariants(p, catalog).filter(v => !v.archived)
-    const baseCode = p.groupId ? p.groupId.replace(/^grp-\d+-/, '') : ''
-    return variants.some(v =>
-      `${v.code} ${v.en} ${v.bn} ${v.detail} ${v.detailBn} ${v.variantName ?? ''} ${v.variantNameBn ?? ''} ${baseCode}`
-        .toLowerCase()
-        .includes(trimmed)
-    )
-  })
+    if (!variants.length) continue
+
+    let bestScore = 0
+    for (const v of variants) {
+      const s = scoreProductVariant(v, cleanQ, compactQ, queryTokens)
+      if (s > bestScore) bestScore = s
+    }
+
+    // Current category affinity bonus
+    if (bestScore > 0 && p.category === category) {
+      bestScore += 25
+    }
+
+    if (bestScore > 0) {
+      scoredList.push({ product: p, score: bestScore })
+    }
+  }
+
+  scoredList.sort((a, b) => b.score - a.score)
+  return scoredList.map(item => item.product)
 }
 
 export function customerLedger(customerId: string, receipts: Receipt[], transactions: AccountTransaction[] = []): AccountTransaction[] {

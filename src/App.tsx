@@ -28,6 +28,8 @@ import {
   getProductVariants,
   displayCatalogProducts,
   searchCatalog,
+  scoreProductVariant,
+  cleanSearchText,
   type Category,
   type Customer,
   type AccountTransaction,
@@ -545,8 +547,8 @@ export default function App() {
   const chooseProduct = (product: Product) => {
     setQuantityProduct(product)
     const variants = getSaleVariants(product)
-    const qTrim = query.trim().toLowerCase()
-    const matchingVariant = (qTrim ? variants.find(v => v.code.toLowerCase() === qTrim || (v.variantName ?? '').toLowerCase() === qTrim || (v.variantNameBn ?? '').toLowerCase() === qTrim) : null) ?? variants[0] ?? product
+    const qTrim = query.trim()
+    const matchingVariant = (qTrim ? variants.map(v => ({ v, score: scoreProductVariant(v, qTrim) })).filter(item => item.score > 0).sort((a, b) => b.score - a.score)[0]?.v : null) ?? variants[0] ?? product
     setSelectedVariant(matchingVariant)
     setQty(isMoneyUnit(matchingVariant.unit) ? '100' : '1')
     setInputError('')
@@ -688,7 +690,16 @@ export default function App() {
             <div className="panel-heading"><div className="section-title"><h2 id="products-heading">{t('products')}</h2><span className="count-badge">{catalog.length}</span></div><span className="panel-heading-meta">{t('available')}</span></div>
             <div className={`search-box ${quantityProduct ? 'subdued' : ''}`}><Icon name="search" size={20}/><input ref={searchRef} aria-label={t('searchLabel')} placeholder={t('search')} value={query} autoComplete="off" spellCheck={false} onChange={e => { setQuery(e.target.value); setQuantityProduct(null); setInputError('') }} onKeyDown={e => {
               if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1))); setSelected(next); productRefs.current[next]?.scrollIntoView({ block: 'nearest' }) }
-              if (e.key === 'Enter') { e.preventDefault(); const qTrim = query.trim().toLowerCase(); const exact = filtered.find(p => { const base = p.groupId ? p.groupId.replace(/^grp-\d+-/, '').toLowerCase() : ''; return p.code.toLowerCase() === qTrim || base === qTrim || getVariants(p).some(v => v.code.toLowerCase() === qTrim) }); const target = exact ?? filtered[selected]; if (target) chooseProduct(target) }
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                const qClean = cleanSearchText(query).trim().replace(/[\s\-]/g, '')
+                const exact = filtered.find(p => {
+                  const base = p.groupId ? cleanSearchText(p.groupId.replace(/^grp-\d+-/, '')).replace(/[\s\-]/g, '') : ''
+                  return cleanSearchText(p.code).replace(/[\s\-]/g, '') === qClean || base === qClean || getVariants(p).some(v => cleanSearchText(v.code).replace(/[\s\-]/g, '') === qClean)
+                })
+                const target = exact ?? filtered[selected]
+                if (target) chooseProduct(target)
+              }
             }}/><kbd>F2</kbd>{query && <button className="icon-button" aria-label={t('clear')} onClick={() => { setQuery(''); goSearch() }}><Icon name="close" size={14}/></button>}</div>
             <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}<span>{c === 'recent' ? recentProducts.length : c === 'all' ? catalog.length : catalog.filter(product => product.category === c).length}</span></button>)}</div>
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>
