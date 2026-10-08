@@ -666,7 +666,7 @@ export default function App() {
               if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1))); setSelected(next); productRefs.current[next]?.scrollIntoView({ block: 'nearest' }) }
               if (e.key === 'Enter') { e.preventDefault(); const qTrim = query.trim().toLowerCase(); const exact = filtered.find(p => { const base = p.groupId ? p.groupId.replace(/^grp-\d+-/, '').toLowerCase() : ''; return p.code.toLowerCase() === qTrim || base === qTrim || getVariants(p).some(v => v.code.toLowerCase() === qTrim) }); const target = exact ?? filtered[selected]; if (target) chooseProduct(target) }
             }}/><kbd>F2</kbd>{query && <button className="icon-button" aria-label={t('clear')} onClick={() => { setQuery(''); goSearch() }}><Icon name="close" size={14}/></button>}</div>
-            <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}{c === 'recent' ? <span>{recentProducts.length}</span> : c === 'all' ? <span>{catalog.length}</span> : null}</button>)}</div>
+            <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}<span>{c === 'recent' ? recentProducts.length : c === 'all' ? catalog.length : catalog.filter(product => product.category === c).length}</span></button>)}</div>
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>
             <div className="product-list" aria-label={t('products')}>
               {filtered.map((p, index) => <button key={p.id} ref={el => { productRefs.current[index] = el }} className={`product-row ${selected === index ? 'selected' : ''} ${quantityProduct?.id === p.id ? 'entering' : ''}`} onClick={() => { setSelected(index); chooseProduct(p) }} onFocus={() => setSelected(index)} onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))); productRefs.current[next]?.focus() } }}>
@@ -778,7 +778,6 @@ export default function App() {
           <div className="panel data-panel">
             <div className="panel-heading">
               <div className="section-title">
-                <span className="section-number">01</span>
                 <h2>{t(view === 'inventory' ? 'products' : view === 'accounts' ? 'customerAccounts' : 'recentSales')}</h2>
                 {view === 'accounts' && <span className="count-badge">{customerCatalog.length}</span>}
                 {view === 'reports' && <span className="count-badge">{windowReceipts.length}</span>}
