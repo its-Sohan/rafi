@@ -79,7 +79,7 @@ const en = {
   totalDue: 'Total due', availableCredit: 'Available credit', loan: 'Loan / Advance', recordPayment: 'Receive payment',
   recordLoan: 'Disburse loan', recordAdjustment: 'Credit adjust', addTransaction: 'New entry',
   paymentReceived: 'Payment received', loanDisbursed: 'Loan recorded', txSaved: 'Transaction recorded',
-  typeLabel: 'Entry type', txSaleDue: 'Store sale due', txPayment: 'Due payment received', txLoan: 'Loan / Cash advance given',
+  typeLabel: 'Entry type', txSaleDue: 'Sale due', txPayment: 'Due payment received', txLoan: 'Loan / Cash advance given',
   txAdjustment: 'Balance adjustment', txHistory: 'Ledger history', noTx: 'No account transactions recorded yet.',
   offlineAccess: 'Offline reopening', offlineReady: 'Ready on this device', offlinePreparing: 'Preparing offline cache…', offlineUnavailable: 'Unavailable in this browser', offlineDevelopment: 'Available in the production build',
 }
