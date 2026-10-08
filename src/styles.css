@@ -30,12 +30,14 @@
 .main-content .panel-heading{height:52px;padding:0 var(--panel-inset)}
 .main-content .section-title h2{font-size:16px}
 .main-content .panel-heading-meta{font-size:10px}
-.main-content .checkout-grid{gap:18px;height:auto;min-height:0}
+.main-content .checkout-grid{gap:18px;height:auto;min-height:0;margin-bottom:var(--workspace-gutter)}
 .main-content .search-box{margin:12px var(--panel-inset) 0;height:42px;min-height:42px}
 .main-content .search-box input{font-size:var(--body-size)}
 .main-content .category-tabs{padding:8px var(--panel-inset);gap:3px;overflow-x:auto;flex-shrink:0}
 .main-content .category-tabs>button{padding:6px 10px;font-size:11px}
 .main-content .product-table-head{padding:0 36px 8px var(--panel-inset);font-size:9px}
+.main-content .product-list,.main-content .bill-list,.main-content .secondary-view{scrollbar-width:none}
+.main-content .product-list::-webkit-scrollbar,.main-content .bill-list::-webkit-scrollbar,.main-content .secondary-view::-webkit-scrollbar{display:none}
 .main-content .product-row{min-height:var(--row-height);padding:10px var(--panel-inset);gap:12px}
 .main-content .product-art{width:38px;height:38px}
 .main-content .product-art svg{width:29px;height:29px}
@@ -44,6 +46,8 @@
 .main-content .product-info code{font-size:10px}
 .main-content .product-price>strong,.main-content .bill-qty,.main-content .bill-amount{font-size:var(--body-size)}
 .main-content .product-price>span,.main-content .bill-qty>span{font-size:10px}
+.main-content .bill-qty{min-width:0;white-space:nowrap}
+.main-content .bill-qty>.bill-qty-value{display:block;width:max-content;min-width:100%;font:inherit;color:inherit;margin-top:0;white-space:nowrap}
 .main-content .quantity-lane{padding:0 var(--panel-inset);min-height:52px}
 .main-content .quantity-lane form{min-height:52px}
 .main-content .quantity-placeholder{font-size:11px}
@@ -51,7 +55,7 @@
 .main-content .quantity-field{height:36px}
 .main-content .quantity-field input{font-size:14px}
 .main-content .add-button{height:36px;min-width:36px}
-.main-content .catalog-footnote{padding:7px var(--panel-inset);font-size:9px}
+.main-content .catalog-footnote{padding:7px var(--panel-inset) var(--panel-inset);font-size:9px}
 .main-content .bill-customer{padding:10px var(--panel-inset);flex-shrink:0}
 .main-content .customer-select>span:nth-child(2){font-size:13px}
 .main-content .customer-select small{font-size:10px}
@@ -60,13 +64,13 @@
 .main-content .bill-table-head{padding:8px var(--panel-inset);font-size:9px;flex-shrink:0}
 .main-content .bill-row{min-height:var(--row-height);padding:10px var(--panel-inset)}
 .main-content .bill-end{margin:10px auto}
-.main-content .bill-summary{padding:12px var(--panel-inset) 10px;flex-shrink:0}
+.main-content .bill-summary{padding:12px var(--panel-inset) var(--panel-inset);flex-shrink:0}
 .main-content .summary-row{margin-bottom:6px;font-size:11px}
 .main-content .summary-row>span:last-child{font-size:12px}
 .main-content .summary-row small{font-size:10px}
 .main-content .discount-button{font-size:11px}
 .main-content .total-row{margin-top:8px;padding:10px 0 12px;gap:10px}
-.main-content .total-row>strong{font-size:34px}
+.main-content .total-row>strong{font-size:34px;min-width:9ch;text-align:right;font-kerning:none}
 .main-content .total-row>div>span{font-size:13px}
 .main-content .payment-button{height:46px;font-size:14px}
 .main-content .payment-caption{margin-top:6px;font-size:9px}
@@ -75,6 +79,7 @@
 .main-content .bill-empty h3{font-size:18px}
 .main-content .bill-empty p{font-size:13px}
 .main-content .bill-empty .text-button{font-size:12px;margin-top:5px}
+.app-shell>.toast{bottom:calc(12px + env(safe-area-inset-bottom, 0px))}
 .main-content .metrics-grid{gap:18px;margin-bottom:18px}
 .main-content .metric-card{padding:18px}
 .main-content .metric-card>strong{font-size:26px;margin-top:16px}
@@ -332,7 +337,7 @@
   }
   .main-content .add-button kbd{display:none}
   .main-content .catalog-footnote{
-    padding:5px var(--panel-inset);
+    padding:5px var(--panel-inset) var(--panel-inset);
     font-size:7.5px;
   }
 
@@ -374,7 +379,7 @@
     align-items:center;
     justify-content:center;
   }
-  .main-content .bill-summary{padding:9px var(--panel-inset)}
+  .main-content .bill-summary{padding:9px var(--panel-inset) var(--panel-inset)}
   .main-content .summary-row{font-size:9.5px;margin-bottom:4px}
   .main-content .total-row{
     margin-top:5px;
@@ -1963,3 +1968,36 @@
 .archive-item-button{padding:6px 9px;border:1px solid var(--line);border-radius:3px;color:#74786c;font-size:10px;white-space:nowrap}
 .archive-item-button:hover{background:#f4f5f0;color:var(--ink)}
 .product-discontinued .archive-item-button{color:#536b9e}
+
+.heading-right .today-summary{font-size:12px;gap:7px;justify-content:flex-end;width:auto}
+.heading-right .today-summary>strong{font-size:16px;color:var(--ink)}
+@media(max-width:680px){
+  .heading-right{display:block}
+  .heading-right .today-summary{font-size:8px;gap:3px}
+  .heading-right .today-summary>strong{font-size:11px}
+  .heading-date{font-size:8px}
+}
+
+.shortcut-bar.shortcut-toast{
+  position:fixed;
+  left:calc(50% + 44px);
+  bottom:70px;
+  transform:translateX(-50%);
+  width:max-content;
+  max-width:calc(100vw - 110px);
+  min-height:0;
+  height:auto;
+  padding:10px 14px;
+  gap:16px;
+  flex-wrap:wrap;
+  border:1px solid var(--line);
+  box-shadow:3px 3px 0 #22231f20;
+  z-index:100;
+  background:var(--white);
+}
+.shortcut-toast .shortcut-items{flex-wrap:wrap}
+@media(max-width:1200px){.shortcut-bar.shortcut-toast{left:calc(50% + 36px)}}
+@media(max-width:680px){
+  .shortcut-bar.shortcut-toast{left:calc(50% + 27px);bottom:60px;padding:9px 11px;gap:8px}
+  .shortcut-toast .shortcut-items{flex-shrink:1}
+}

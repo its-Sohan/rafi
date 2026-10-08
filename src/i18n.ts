@@ -38,7 +38,7 @@ const en = {
   language: 'Interface language', appearance: 'Appearance', light: 'Paper / light', dark: 'macOS Dark', toggleTheme: 'Toggle theme', settingsHint: 'A quiet workspace. A quicker counter.',
   storage: 'Local storage', storageHint: 'Drafts and receipts stay in this browser. Cloudflare D1 synchronization will be added in the next phase.',
   export: 'Export backup', backupExported: 'Backup downloaded', version: 'Hisab · Prototype 0.1',
-  catalogHint: 'A clear view of what is on your shelves.', stockValue: 'Stock value at selling price', variants: 'Sellable Items',
+  catalogHint: 'A clear view of what is on your shelves.', stockValue: 'Stock value', variants: 'Sellable Items',
   lowStock: 'Low stock items', catalogNote: 'Demo opening stock, less sales completed on this device.',
   balanceHint: 'Every customer. Every outstanding balance.', customerAccounts: 'Customer accounts', outstanding: 'Outstanding dues',
   customersLabel: 'Customers', accountNote: 'Demo customers. Balances come from sales recorded on this device.', phone: 'PHONE', balance: 'BALANCE', settled: 'Settled',

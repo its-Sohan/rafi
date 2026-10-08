@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useRef } from 'react'
-import type { Line } from './model'
+import { money, type Line } from './model'
 
 /** Brief feedback on real changes; values and controls update immediately. */
 export function useLedgerMotion({ lines, total, receipts, ready, toast }: {
@@ -9,6 +9,8 @@ export function useLedgerMotion({ lines, total, receipts, ready, toast }: {
   const previous = useRef({ lines, total, receipts, ready: false })
   const running = useRef(new Set<Animation>())
   const perElement = useRef(new WeakMap<Element, Animation>())
+  const counterValue = useRef(total)
+  const counterFrame = useRef<number | null>(null)
 
   const animate = (element: Element | null | undefined, frames: Keyframe[], duration: number) => {
     if (!element || typeof element.animate !== 'function' || window.matchMedia('(prefers-reduced-motion: reduce)').matches) return
@@ -28,7 +30,12 @@ export function useLedgerMotion({ lines, total, receipts, ready, toast }: {
     const before = previous.current
     previous.current = { lines, total, receipts, ready }
     // Loading a saved draft should never replay item-added feedback.
-    if (!ready || !before.ready || !root.current) return
+    if (!ready || !before.ready || !root.current) {
+      counterValue.current = total
+      if (counterFrame.current !== null) cancelAnimationFrame(counterFrame.current)
+      counterFrame.current = null
+      return
+    }
     const accent = getComputedStyle(root.current).getPropertyValue('--blue').trim()
     const rows = [...root.current.querySelectorAll<HTMLElement>('.bill-row')]
     for (const line of lines) {
@@ -44,7 +51,44 @@ export function useLedgerMotion({ lines, total, receipts, ready, toast }: {
       animate(row.querySelector('.bill-qty'), [{ translate: '0 -3px' }, { translate: '0 0' }], 170)
     }
     if (before.total !== total) {
-      animate(root.current.querySelector('.total-row>strong'), [{ translate: '0 2px', opacity: .75 }, { translate: '0 0', opacity: 1 }], 180)
+      const totalElement = root.current.querySelector<HTMLElement>('.total-row>strong')
+      const amountNode = totalElement?.childNodes[1]
+      if (amountNode?.nodeType === Node.TEXT_NODE) {
+        if (counterFrame.current !== null) cancelAnimationFrame(counterFrame.current)
+        const start = counterValue.current
+        const startTime = performance.now()
+        const duration = 800
+        let lastText = money(start)
+        const updateCounter = (time: number) => {
+          const progress = Math.min(Math.max((time - startTime) / duration, 0), 1)
+          const easedProgress = (1 - Math.cos(Math.PI * progress)) / 2
+          const value = start + (total - start) * easedProgress
+          // Keep fractional digits steady instead of flashing random cents each frame.
+          const displayedValue = progress === 1 ? total : start + Math.trunc((value - start) / 100) * 100
+          const text = money(displayedValue)
+          if (text !== lastText) {
+            amountNode.textContent = text
+            lastText = text
+          }
+          counterValue.current = displayedValue
+          if (progress < 1) {
+            counterFrame.current = requestAnimationFrame(updateCounter)
+          } else {
+            amountNode.textContent = money(total)
+            counterValue.current = total
+            counterFrame.current = null
+          }
+        }
+        if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+          amountNode.textContent = money(total)
+          counterValue.current = total
+          counterFrame.current = null
+        } else {
+          // Restore the displayed value before React's new total can flash on screen.
+          amountNode.textContent = money(start)
+          counterFrame.current = requestAnimationFrame(updateCounter)
+        }
+      }
     }
     if (receipts > before.receipts) {
       const summary = root.current.querySelector('.today-summary>strong')
@@ -60,6 +104,7 @@ export function useLedgerMotion({ lines, total, receipts, ready, toast }: {
   useEffect(() => () => {
     running.current.forEach(animation => animation.cancel())
     running.current.clear()
+    if (counterFrame.current !== null) cancelAnimationFrame(counterFrame.current)
   }, [])
 
   return root

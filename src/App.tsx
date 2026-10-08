@@ -1,4 +1,4 @@
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from 'react'
 import { Icon, PixelMark, ProductArt } from './Icons'
 import {
   allProducts,
@@ -48,6 +48,29 @@ type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | '
 const receiptNumber = (n: number) => String(n).padStart(4, '0')
 const dayKey = (date: string | Date) => new Date(date).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
 const rateText = (product: Product) => `৳ ${money(product.price)} / ${isMoneyUnit(product.unit) ? '৳1' : product.unit}`
+
+function FittedQuantity({ value }: { value: string }) {
+  const ref = useRef<HTMLSpanElement>(null)
+  useLayoutEffect(() => {
+    const element = ref.current
+    const button = element?.parentElement
+    if (!element || !button) return
+    const fit = () => {
+      element.style.fontSize = ''
+      const naturalWidth = element.scrollWidth
+      const availableWidth = button.clientWidth
+      if (naturalWidth > availableWidth && availableWidth > 0) {
+        const fontSize = parseFloat(getComputedStyle(element).fontSize)
+        element.style.fontSize = `${fontSize * availableWidth / naturalWidth}px`
+      }
+    }
+    fit()
+    const observer = new ResizeObserver(fit)
+    observer.observe(button)
+    return () => observer.disconnect()
+  }, [value])
+  return <span className="bill-qty-value" ref={ref}>{value}</span>
+}
 
 function Modal({ children, title, onClose, className = '', canClose = true }: { children: ReactNode; title: string; onClose: () => void; className?: string; canClose?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -118,6 +141,7 @@ export default function App() {
   const [reportWindow, setReportWindow] = useState<ReportWindow>('today')
   const [billSelection, setBillSelection] = useState(0)
   const [toast, setToast] = useState<{ text: string; undo?: () => void } | null>(null)
+  const [showShortcutToast, setShowShortcutToast] = useState(true)
   const searchRef = useRef<HTMLInputElement>(null)
   const qtyRef = useRef<HTMLInputElement>(null)
   const billRef = useRef<HTMLDivElement>(null)
@@ -152,6 +176,7 @@ export default function App() {
     try { localStorage.setItem('hisab-theme', theme) } catch { /* Theme can still change for this session. */ }
   }, [theme])
   useEffect(() => { if (toast) { const timer = setTimeout(() => setToast(null), 4500); return () => clearTimeout(timer) } }, [toast])
+  useEffect(() => { const timer = setTimeout(() => setShowShortcutToast(false), 10_000); return () => clearTimeout(timer) }, [])
   useEffect(() => { setSelected(0) }, [query, category])
   useEffect(() => { if (quantityProduct) { qtyRef.current?.focus(); qtyRef.current?.select() } }, [quantityProduct])
   useEffect(() => { if (ready) searchRef.current?.focus() }, [ready, view])
@@ -635,7 +660,6 @@ export default function App() {
         <div className="wordmark">hisab<span>.</span></div>
         <span className="top-divider"/>
         <div className="shop-label"><Icon name="inventory" size={16}/><span>{t('shop')}</span><Icon name="down" size={12}/></div>
-        <span className="prototype-label">{t('localDemo')}</span>
         <div className="topbar-right">
           <span className={`connection ${online ? '' : 'offline'}`}><i/>{t(online ? 'online' : 'offline')}</span>
           <button className="language-toggle" onClick={() => setLang(lang === 'en' ? 'bn' : 'en')} aria-label={lang === 'en' ? 'Switch to Bangla' : 'Switch to English'}>
@@ -655,7 +679,7 @@ export default function App() {
       </header>
 
       <main className="main-content">
-        <section className="page-heading"><div><div className="eyebrow"><span className="tiny-cross"/>{t('workspace')}<span className="eyebrow-slash">/</span>0{(['sales', 'inventory', 'accounts', 'reports'] as View[]).indexOf(view) + 1}</div><h1>{t(view)}<span className="heading-dot">.</span></h1><p>{view === 'sales' ? t('welcome') : t(view === 'inventory' ? 'catalogHint' : view === 'accounts' ? 'balanceHint' : 'reportHint')}</p></div><div className="heading-right"><div className="counter-tag"><span className="pixel-dot"/>{t('counter')}<span className="open-tag">{t('open')}</span></div><div className="heading-date">{now.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' })}<span> / </span>{now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: false })}</div></div></section>
+        <section className="page-heading"><div><div className="eyebrow"><span className="tiny-cross"/>{t('workspace')}<span className="eyebrow-slash">/</span>0{(['sales', 'inventory', 'accounts', 'reports'] as View[]).indexOf(view) + 1}</div><h1>{t(view)}<span className="heading-dot">.</span></h1><p>{view === 'sales' ? t('welcome') : t(view === 'inventory' ? 'catalogHint' : view === 'accounts' ? 'balanceHint' : 'reportHint')}</p></div><div className="heading-right"><span className="today-summary">{t('today')}<strong>৳ {money(todaySales)}</strong><span> / </span>{todayReceipts.length} {t('receiptsToday').toLowerCase()}</span><div className="heading-date">{now.toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', day: '2-digit', month: 'short', year: 'numeric' })}<span> / </span>{now.toLocaleTimeString('en-GB', { timeZone: 'Asia/Dhaka', hour: '2-digit', minute: '2-digit', hour12: false })}</div></div></section>
 
         {storageStatus === 'error' && <div className="storage-alert" role="alert">{t('storageError')}<button onClick={exportBackup}>{t('export')} <Icon name="download" size={15}/></button></div>}
 
@@ -753,7 +777,7 @@ export default function App() {
             }}>
               {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} data-product-id={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
                 <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{rateText(p)}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
-                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}>{quantityWithUnit(line.quantity, p.unit)}<span>{isMoneyUnit(p.unit) ? t('topUp') : p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
+                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}><FittedQuantity value={quantityWithUnit(line.quantity, p.unit)}/><span>{isMoneyUnit(p.unit) ? t('topUp') : p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
               </div> })}
               {!state.lines.length && <div className="empty-state bill-empty"><div className="empty-pixel"><PixelMark/></div><h3>{t('emptyBill')}</h3><p>{t('emptyBillHint')}</p><button className="text-button" onClick={goSearch}>{t('findItem')} <kbd>F2</kbd></button></div>}
               {state.lines.length > 0 && <div className="bill-end"><span/><Icon name="plus" size={13}/><span/></div>}
@@ -925,10 +949,9 @@ export default function App() {
           </div>{view === 'accounts' && <p className="phase-note">{t('cashbookNote')}</p>}
         </section>}
 
-        <footer className="workspace-footer"><span className="footer-brand"><PixelMark small/><span>SMALL SHOP. BIG POSSIBILITIES.</span></span><span className="today-summary">{t('today')}<strong>৳ {money(todaySales)}</strong><span> / </span>{todayReceipts.length} {t('receiptsToday').toLowerCase()}</span></footer>
       </main>
 
-      <div className="shortcut-bar">
+      {view === 'sales' && showShortcutToast && <div className="shortcut-bar shortcut-toast" role="status">
         <div className="shortcut-items">
           <button onClick={() => { setView('sales'); goSearch() }}><kbd>F2</kbd><span>{t('findItem')}</span></button>
           <span className="shortcut-hint"><kbd>↑</kbd><kbd>↓</kbd><span>{t('navigate')}</span></span>
@@ -939,7 +962,7 @@ export default function App() {
         <button className="help-trigger" onClick={() => openDialog('shortcuts')}>
           <kbd>?</kbd><span>{t('shortcuts')}</span><Icon name="keyboard" size={15}/>
         </button>
-      </div>
+      </div>}
     </div>
 
     {toast && <div className="toast" role="status"><Icon name="check" size={16}/><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null) }}>{t('undo')}</button>}<button className="icon-button" aria-label={t('close')} onClick={() => setToast(null)}><Icon name="close" size={13}/></button></div>}
