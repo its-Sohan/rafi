@@ -25,6 +25,9 @@ import {
   unitMargin,
   unitMarginPercent,
   unitText,
+  getProductVariants,
+  displayCatalogProducts,
+  searchCatalog,
   type Category,
   type Customer,
   type AccountTransaction,
@@ -450,28 +453,11 @@ export default function App() {
   }
 
   // Helper to retrieve all variants for a product
-  const getVariants = (p: Product): Product[] => {
-    if (!p.groupId) return [p]
-    return catalog.filter(item => item.groupId === p.groupId)
-  }
+  const getVariants = (p: Product): Product[] => getProductVariants(p, catalog)
   const getSaleVariants = (p: Product): Product[] => getVariants(p).filter(item => !item.archived)
 
   // Deduplicate products that belong to the same groupId in the sales catalog view
-  const displayCatalog = (() => {
-    const seenGroups = new Set<string>()
-    const list: Product[] = []
-    for (const p of catalog.filter(item => !item.archived)) {
-      if (p.groupId) {
-        if (!seenGroups.has(p.groupId)) {
-          seenGroups.add(p.groupId)
-          list.push(p)
-        }
-      } else {
-        list.push(p)
-      }
-    }
-    return list
-  })()
+  const displayCatalog = displayCatalogProducts(catalog)
 
   // Extract last 10 unique sold items from completed receipts (most recently sold first)
   const recentProducts: Product[] = (() => {
@@ -508,10 +494,7 @@ export default function App() {
     return list
   })()
 
-  const filtered = (category === 'recent' ? recentProducts : displayCatalog.filter(p => !p.archived && (category === 'all' || p.category === category))).filter(p => {
-    const variants = getVariants(p).filter(v => !v.archived)
-    return variants.some(v => `${v.code} ${v.en} ${v.bn} ${v.detail} ${v.detailBn} ${v.variantName ?? ''} ${v.variantNameBn ?? ''}`.toLowerCase().includes(query.toLowerCase().trim()))
-  })
+  const filtered = searchCatalog(catalog, query, category, recentProducts)
 
   const billSubtotal = subtotal(state.lines, catalog)
   const billTotal = Math.max(0, billSubtotal - state.discount)
@@ -537,8 +520,10 @@ export default function App() {
   const chooseProduct = (product: Product) => {
     setQuantityProduct(product)
     const variants = getSaleVariants(product)
-    setSelectedVariant(variants[0] ?? product)
-    setQty(isMoneyUnit((variants[0] ?? product).unit) ? '100' : '1')
+    const qTrim = query.trim().toLowerCase()
+    const matchingVariant = (qTrim ? variants.find(v => v.code.toLowerCase() === qTrim || (v.variantName ?? '').toLowerCase() === qTrim || (v.variantNameBn ?? '').toLowerCase() === qTrim) : null) ?? variants[0] ?? product
+    setSelectedVariant(matchingVariant)
+    setQty(isMoneyUnit(matchingVariant.unit) ? '100' : '1')
     setInputError('')
     requestAnimationFrame(() => qtyRef.current?.focus())
   }
@@ -601,7 +586,7 @@ export default function App() {
     } catch { setModalError(t('saveError')); setStorageStatus('error') }
     finally { paymentLock.current = false; setBusy(false) }
   }
-  const exportBackup = () => { downloadJson({ version: 1, exportedAt: new Date().toISOString(), products, customers, state }, `hisab-backup-${dayKey(now)}.json`); notify('backupExported') }
+  const exportBackup = () => { downloadJson({ version: 1, exportedAt: new Date().toISOString(), products: catalog, customers: customerCatalog, state }, `hisab-backup-${dayKey(now)}.json`); notify('backupExported') }
   const exportCsv = () => {
     const listToExport = windowReceipts
     const rows = [['Receipt', 'Date (UTC)', 'Total (BDT)', 'Profit (BDT)', 'Paid (BDT)', 'Due (BDT)', 'Method'], ...listToExport.map(r => [receiptNumber(r.number), r.createdAt, (r.total / 100).toFixed(2), (receiptProfit(r) / 100).toFixed(2), (r.paid / 100).toFixed(2), (r.due / 100).toFixed(2), r.method])]
@@ -676,10 +661,10 @@ export default function App() {
 
         {view === 'sales' ? <div className="checkout-grid">
           <section className="panel catalog-panel" aria-labelledby="products-heading">
-            <div className="panel-heading"><div className="section-title"><span className="section-number">01</span><h2 id="products-heading">{t('products')}</h2><span className="count-badge">{products.length}</span></div><span className="panel-heading-meta">{t('available')}</span></div>
+            <div className="panel-heading"><div className="section-title"><span className="section-number">01</span><h2 id="products-heading">{t('products')}</h2><span className="count-badge">{catalog.length}</span></div><span className="panel-heading-meta">{t('available')}</span></div>
             <div className={`search-box ${quantityProduct ? 'subdued' : ''}`}><Icon name="search" size={20}/><input ref={searchRef} aria-label={t('searchLabel')} placeholder={t('search')} value={query} autoComplete="off" spellCheck={false} onChange={e => { setQuery(e.target.value); setQuantityProduct(null); setInputError('') }} onKeyDown={e => {
               if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1))); setSelected(next); productRefs.current[next]?.scrollIntoView({ block: 'nearest' }) }
-              if (e.key === 'Enter') { e.preventDefault(); const exact = filtered.find(p => p.code === query.trim()); if (exact ?? filtered[selected]) chooseProduct((exact ?? filtered[selected])!) }
+              if (e.key === 'Enter') { e.preventDefault(); const qTrim = query.trim().toLowerCase(); const exact = filtered.find(p => { const base = p.groupId ? p.groupId.replace(/^grp-\d+-/, '').toLowerCase() : ''; return p.code.toLowerCase() === qTrim || base === qTrim || getVariants(p).some(v => v.code.toLowerCase() === qTrim) }); const target = exact ?? filtered[selected]; if (target) chooseProduct(target) }
             }}/><kbd>F2</kbd>{query && <button className="icon-button" aria-label={t('clear')} onClick={() => { setQuery(''); goSearch() }}><Icon name="close" size={14}/></button>}</div>
             <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'staples', 'fresh', 'household'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}{c === 'recent' ? <span>{recentProducts.length}</span> : c === 'all' ? <span>{catalog.length}</span> : null}</button>)}</div>
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>

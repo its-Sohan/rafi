@@ -101,6 +101,57 @@ export const findCustomerIn = (id: string, list: Customer[]) => list.find(c => c
 export const findProductIn = (id: string, list: Product[]) => list.find(p => p.id === id) ?? products.find(p => p.id === id)!
 export const findProduct = (id: string) => products.find(p => p.id === id)!
 
+export function getProductVariants(product: Product, catalog: Product[] = products): Product[] {
+  if (!product.groupId) return [product]
+  return catalog.filter(item => item.groupId === product.groupId)
+}
+
+export function displayCatalogProducts(catalog: Product[] = products): Product[] {
+  const seenGroups = new Set<string>()
+  const list: Product[] = []
+  for (const p of catalog.filter(item => !item.archived)) {
+    if (p.groupId) {
+      if (!seenGroups.has(p.groupId)) {
+        seenGroups.add(p.groupId)
+        list.push(p)
+      }
+    } else {
+      list.push(p)
+    }
+  }
+  return list
+}
+
+export function searchCatalog(
+  catalog: Product[] = products,
+  query: string = '',
+  category: Category = 'recent',
+  recentProducts: Product[] = []
+): Product[] {
+  const trimmed = query.trim().toLowerCase()
+  const displayList = displayCatalogProducts(catalog)
+
+  const pool = trimmed
+    ? displayList
+    : (category === 'recent'
+        ? recentProducts
+        : displayList.filter(p => category === 'all' || p.category === category))
+
+  if (!trimmed) {
+    return pool
+  }
+
+  return pool.filter(p => {
+    const variants = getProductVariants(p, catalog).filter(v => !v.archived)
+    const baseCode = p.groupId ? p.groupId.replace(/^grp-\d+-/, '') : ''
+    return variants.some(v =>
+      `${v.code} ${v.en} ${v.bn} ${v.detail} ${v.detailBn} ${v.variantName ?? ''} ${v.variantNameBn ?? ''} ${baseCode}`
+        .toLowerCase()
+        .includes(trimmed)
+    )
+  })
+}
+
 export function customerLedger(customerId: string, receipts: Receipt[], transactions: AccountTransaction[] = []): AccountTransaction[] {
   const list: AccountTransaction[] = []
   

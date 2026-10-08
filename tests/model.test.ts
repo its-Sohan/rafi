@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { allCustomers, customerBalance, customerLedger, filterReceiptsByWindow, findProduct, initialState, lineTotal, makeReceipt, migrateShopState, parseMoney, parseQuantity, quantityWithUnit, stockFor, subtotal, type AccountTransaction } from '../src/model.ts'
+import { allProducts, allCustomers, customerBalance, customerLedger, displayCatalogProducts, filterReceiptsByWindow, findProduct, getProductVariants, initialState, lineTotal, makeReceipt, migrateShopState, parseMoney, parseQuantity, quantityWithUnit, searchCatalog, stockFor, subtotal, type AccountTransaction, type Product } from '../src/model.ts'
 
 test('quantities use scaled integers and reject fractional pieces', () => {
   assert.equal(parseQuantity('0.750', 'kg'), 750)
@@ -182,4 +182,135 @@ test('customer provisioning, balance calculations, dues, loans, and credit adjus
   assert.equal(bal.loan, 50000)
   assert.equal(bal.totalPaid, 40000)
   assert.equal(bal.availableCredit, 954400)
+})
+
+test('newly provisioned products are retrievable via catalog search under recent category and across tabs', () => {
+  const newProduct: Product = {
+    id: 'p-custom-mango',
+    code: '201',
+    en: 'Fresh Mango',
+    bn: 'তাজা আম',
+    detail: 'Rajshahi Fazli · kg',
+    detailBn: 'রাজশাহী ফজলি · কেজি',
+    category: 'fresh',
+    unit: 'kg',
+    price: 9000,
+    cost: 7000,
+    stock: 25000,
+    purchased: 25000,
+    art: 'rice',
+    color: '#ffe599',
+  }
+
+  const catalog = allProducts([newProduct])
+  assert.equal(catalog.some(p => p.id === 'p-custom-mango'), true)
+
+  // Recent products list only has existing default sold products, NOT the newly added product
+  const recentProducts = catalog.slice(0, 10).filter(p => p.id !== 'p-custom-mango')
+  assert.equal(recentProducts.some(p => p.id === 'p-custom-mango'), false)
+
+  // Recreating the original bug: when category is 'recent', an empty search returns recentProducts
+  const emptyRecentSearch = searchCatalog(catalog, '', 'recent', recentProducts)
+  assert.equal(emptyRecentSearch.some(p => p.id === 'p-custom-mango'), false)
+
+  // Fix verification: typing the new product code '201' finds the new product even when category is 'recent'
+  const codeSearch = searchCatalog(catalog, '201', 'recent', recentProducts)
+  assert.equal(codeSearch.length, 1)
+  assert.equal(codeSearch[0].id, 'p-custom-mango')
+
+  // Search by English name
+  const enSearch = searchCatalog(catalog, 'mango', 'recent', recentProducts)
+  assert.equal(enSearch.length, 1)
+  assert.equal(enSearch[0].id, 'p-custom-mango')
+
+  // Search by Bengali name
+  const bnSearch = searchCatalog(catalog, 'আম', 'recent', recentProducts)
+  assert.equal(bnSearch.length, 1)
+  assert.equal(bnSearch[0].id, 'p-custom-mango')
+
+  // Search across category tabs: when user is on 'staples' tab and searches for '201' (which is 'fresh')
+  const crossCategorySearch = searchCatalog(catalog, '201', 'staples', recentProducts)
+  assert.equal(crossCategorySearch.length, 1)
+  assert.equal(crossCategorySearch[0].id, 'p-custom-mango')
+
+  // But without search query, category filtering still isolates staples
+  const staplesTab = searchCatalog(catalog, '', 'staples', recentProducts)
+  assert.equal(staplesTab.every(p => p.category === 'staples'), true)
+  assert.equal(staplesTab.some(p => p.id === 'p-custom-mango'), false)
+})
+
+test('multi-variant custom products deduplicate in display catalog and match by base code, variant code, and variant names', () => {
+  const groupId = 'grp-12345678-501'
+  const variant1: Product = {
+    id: 'p-soap-red',
+    code: '501-R',
+    en: 'Beauty Soap',
+    bn: 'সৌন্দর্য সাবান',
+    detail: 'Rose · 100g',
+    detailBn: 'গোলাপ · ১০০ গ্রাম',
+    category: 'household',
+    unit: 'pc',
+    price: 6500,
+    cost: 5000,
+    stock: 20000,
+    purchased: 20000,
+    groupId,
+    variantName: 'Rose',
+    variantNameBn: 'গোলাপ',
+    art: 'soap',
+    color: '#ffc0cb',
+  }
+
+  const variant2: Product = {
+    id: 'p-soap-white',
+    code: '501-W',
+    en: 'Beauty Soap',
+    bn: 'সৌন্দর্য সাবান',
+    detail: 'Jasmine · 100g',
+    detailBn: 'বেলি · ১০০ গ্রাম',
+    category: 'household',
+    unit: 'pc',
+    price: 6500,
+    cost: 5000,
+    stock: 20000,
+    purchased: 20000,
+    groupId,
+    variantName: 'Jasmine',
+    variantNameBn: 'বেলি',
+    art: 'soap',
+    color: '#ffffff',
+  }
+
+  const catalog = allProducts([variant1, variant2])
+
+  // Display catalog deduplicates the variants into a single group entry
+  const displayList = displayCatalogProducts(catalog)
+  const groupItems = displayList.filter(p => p.groupId === groupId)
+  assert.equal(groupItems.length, 1)
+
+  // getProductVariants returns both variants for the product
+  const variants = getProductVariants(groupItems[0], catalog)
+  assert.equal(variants.length, 2)
+
+  // Match by base group code '501'
+  const baseCodeMatch = searchCatalog(catalog, '501', 'recent', [])
+  assert.equal(baseCodeMatch.length, 1)
+  assert.equal(baseCodeMatch[0].groupId, groupId)
+
+  // Match by variant 1 code '501-R'
+  const var1Match = searchCatalog(catalog, '501-R', 'recent', [])
+  assert.equal(var1Match.length, 1)
+
+  // Match by variant 2 name 'Jasmine'
+  const var2NameMatch = searchCatalog(catalog, 'Jasmine', 'recent', [])
+  assert.equal(var2NameMatch.length, 1)
+
+  // Match by Bengali variant name 'গোলাপ'
+  const bnVarMatch = searchCatalog(catalog, 'গোলাপ', 'recent', [])
+  assert.equal(bnVarMatch.length, 1)
+
+  // Archived products are excluded from sales catalog search
+  const archivedCatalog: Product[] = catalog.map(p => p.groupId === groupId ? { ...p, archived: true } : p)
+  const archivedSearch = searchCatalog(archivedCatalog, '501', 'all', [])
+  assert.equal(archivedSearch.some(p => p.groupId === groupId), false)
 })
