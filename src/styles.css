@@ -1913,7 +1913,6 @@
 /* Light theme secondary text needs stronger contrast on the warm paper surfaces. */
 :root:not(.dark):not([data-theme="dark"]) .eyebrow,
 :root:not(.dark):not([data-theme="dark"]) .page-heading p,
-:root:not(.dark):not([data-theme="dark"]) .heading-date,
 :root:not(.dark):not([data-theme="dark"]) .section-number,
 :root:not(.dark):not([data-theme="dark"]) .panel-heading-meta,
 :root:not(.dark):not([data-theme="dark"]) .product-info>span,
@@ -1941,18 +1940,26 @@
 :root:not(.dark):not([data-theme="dark"]) .search-box input::placeholder,
 :root:not(.dark):not([data-theme="dark"]) .prototype-label,
 :root:not(.dark):not([data-theme="dark"]) .language-toggle,
-:root:not(.dark):not([data-theme="dark"]) .heading-date>span,
 :root:not(.dark):not([data-theme="dark"]) .section-number {
   color: #686c62;
+}
+
+:root:not(.dark):not([data-theme="dark"]) .heading-date {
+  color: #4b4f45;
+}
+
+:root:not(.dark):not([data-theme="dark"]) .heading-date>span {
+  color: #64685c;
 }
 
 /* Discontinued inventory records remain visible but read as inactive. */
 .product-discontinued{background:#f2f2ef;color:#85877f}
 .product-discontinued .inventory-product strong,.product-discontinued .inventory-product small,.product-discontinued code{color:#85877f}
 .product-discontinued .inventory-product .product-art{filter:grayscale(1);opacity:.58}
-.product-status{display:inline-flex;align-items:center;padding:4px 7px;border-radius:999px;font-size:10px;font-weight:600;white-space:nowrap}
-.product-status.active{background:#edf3e8;color:#5f784c}
-.product-status.discontinued{background:#e4e4e1;color:#777970}
+.product-status{display:inline-flex;align-items:center;gap:5px;padding:3px 7px;border:1px solid transparent;border-radius:3px;font-size:9px;font-weight:550;line-height:1.2;white-space:nowrap}
+.product-status::before{content:'';width:5px;height:5px;border-radius:50%;background:currentColor}
+.product-status.active{background:#f1f4eb;border-color:#e2e9d8;color:#647c4e}
+.product-status.discontinued{background:#f3f3f0;border-color:#e7e7e2;color:#85877f}
 .archive-item-button{padding:6px 9px;border:1px solid var(--line);border-radius:3px;color:#74786c;font-size:10px;white-space:nowrap}
 .archive-item-button:hover{background:#f4f5f0;color:var(--ink)}
 .product-discontinued .archive-item-button{color:#536b9e}

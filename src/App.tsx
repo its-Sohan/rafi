@@ -661,7 +661,7 @@ export default function App() {
 
         {view === 'sales' ? <div className="checkout-grid">
           <section className="panel catalog-panel" aria-labelledby="products-heading">
-            <div className="panel-heading"><div className="section-title"><span className="section-number">01</span><h2 id="products-heading">{t('products')}</h2><span className="count-badge">{catalog.length}</span></div><span className="panel-heading-meta">{t('available')}</span></div>
+            <div className="panel-heading"><div className="section-title"><h2 id="products-heading">{t('products')}</h2><span className="count-badge">{catalog.length}</span></div><span className="panel-heading-meta">{t('available')}</span></div>
             <div className={`search-box ${quantityProduct ? 'subdued' : ''}`}><Icon name="search" size={20}/><input ref={searchRef} aria-label={t('searchLabel')} placeholder={t('search')} value={query} autoComplete="off" spellCheck={false} onChange={e => { setQuery(e.target.value); setQuantityProduct(null); setInputError('') }} onKeyDown={e => {
               if (['ArrowDown', 'ArrowUp'].includes(e.key)) { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, selected + (e.key === 'ArrowDown' ? 1 : -1))); setSelected(next); productRefs.current[next]?.scrollIntoView({ block: 'nearest' }) }
               if (e.key === 'Enter') { e.preventDefault(); const qTrim = query.trim().toLowerCase(); const exact = filtered.find(p => { const base = p.groupId ? p.groupId.replace(/^grp-\d+-/, '').toLowerCase() : ''; return p.code.toLowerCase() === qTrim || base === qTrim || getVariants(p).some(v => v.code.toLowerCase() === qTrim) }); const target = exact ?? filtered[selected]; if (target) chooseProduct(target) }
@@ -742,7 +742,7 @@ export default function App() {
           </section>
 
           <section className="panel bill-panel" aria-labelledby="bill-heading">
-            <div className="panel-heading"><div className="section-title"><span className="section-number">02</span><h2 id="bill-heading">{t('currentBill')}</h2><span className="count-badge">{state.lines.length}</span></div><span className="bill-number">#{receiptNumber(state.receipts.length + 1)}</span></div>
+            <div className="panel-heading"><div className="section-title"><h2 id="bill-heading">{t('currentBill')}</h2><span className="count-badge">{state.lines.length}</span></div><span className="bill-number">#{receiptNumber(state.receipts.length + 1)}</span></div>
             <div className="bill-customer"><button className="customer-select" onClick={() => { setCustomerQuery(''); openDialog('customer') }}><span className="customer-avatar"><Icon name="accounts" size={18}/></span><span>{customer ? customer[lang] : t('walkIn')}<small>{customer ? customer.phone : t('chooseCustomer')}</small></span><Icon name="down" size={14}/></button><button className="clear-button" onClick={() => openDialog('clear')} disabled={!state.lines.length}>{t('clear')}<Icon name="reset" size={14}/></button></div>
             <div className="bill-table-head"><span>{t('product')}</span><span>{t('quantity')}</span><span>{t('amount')}</span><span/></div>
             <div className="bill-list" ref={billRef} tabIndex={0} aria-label={`${t('currentBill')} · Alt+B`} onKeyDown={e => {

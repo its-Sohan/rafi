@@ -2,7 +2,7 @@ import type { Lang } from './model'
 
 const en = {
   sales: 'Sales counter', inventory: 'Inventory', accounts: 'Accounts', reports: 'Reports', settings: 'Settings',
-  shop: 'Stationery & recharge shop', workspace: 'DOKAN WORKSPACE', today: 'Today', localDemo: 'LOCAL PROTOTYPE',
+  shop: 'Stationery & recharge shop', workspace: 'WORKSPACE', today: 'Today', localDemo: 'LOCAL PROTOTYPE',
   counter: 'COUNTER 01', open: 'OPEN', date: 'Date', products: 'Products', available: 'in the catalog',
   search: 'Product code or name…', searchLabel: 'Find a product by code or name', recent: 'Recent', all: 'All items', staples: 'Stationery', fresh: 'Recharge', household: 'Daily needs',
   product: 'PRODUCT', price: 'PRICE', stock: 'STOCK', code: 'CODE', quantity: 'QTY', amount: 'AMOUNT',
@@ -38,7 +38,7 @@ const en = {
   language: 'Interface language', appearance: 'Appearance', light: 'Paper / light', dark: 'macOS Dark', toggleTheme: 'Toggle theme', settingsHint: 'A quiet workspace. A quicker counter.',
   storage: 'Local storage', storageHint: 'Drafts and receipts stay in this browser. Cloudflare D1 synchronization will be added in the next phase.',
   export: 'Export backup', backupExported: 'Backup downloaded', version: 'Hisab · Prototype 0.1',
-  catalogHint: 'A clear view of what is on your shelves.', stockValue: 'Stock value at selling price', variants: 'Sellable variants',
+  catalogHint: 'A clear view of what is on your shelves.', stockValue: 'Stock value at selling price', variants: 'Sellable Items',
   lowStock: 'Low stock items', catalogNote: 'Demo opening stock, less sales completed on this device.',
   balanceHint: 'Every customer. Every outstanding balance.', customerAccounts: 'Customer accounts', outstanding: 'Outstanding dues',
   customersLabel: 'Customers', accountNote: 'Demo customers. Balances come from sales recorded on this device.', phone: 'PHONE', balance: 'BALANCE', settled: 'Settled',
