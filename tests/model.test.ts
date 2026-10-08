@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { allCustomers, customerBalance, customerLedger, filterReceiptsByWindow, findProduct, initialState, lineTotal, makeReceipt, parseMoney, parseQuantity, stockFor, subtotal, type AccountTransaction } from '../src/model.ts'
+import { allCustomers, customerBalance, customerLedger, filterReceiptsByWindow, findProduct, initialState, lineTotal, makeReceipt, migrateShopState, parseMoney, parseQuantity, quantityWithUnit, stockFor, subtotal, type AccountTransaction } from '../src/model.ts'
 
 test('quantities use scaled integers and reject fractional pieces', () => {
   assert.equal(parseQuantity('0.750', 'kg'), 750)
@@ -14,6 +14,38 @@ test('money and weighted totals round once at the line boundary', () => {
   assert.equal(lineTotal(13500, 750), 10125)
   assert.equal(lineTotal(12345, 333), 4111)
   assert.equal(subtotal(initialState.lines), 30600)
+})
+test('recharge services use a money-denominated quantity instead of pieces', () => {
+  const recharge = findProduct('milk')
+  const meterTopUp = findProduct('salt')
+  assert.equal(recharge.unit, 'BDT')
+  assert.equal(meterTopUp.unit, 'BDT')
+  assert.equal(parseQuantity('500', recharge.unit), 500000)
+  assert.equal(parseQuantity('500.25', recharge.unit), 500250)
+  assert.equal(parseQuantity('500.251', recharge.unit), null)
+  assert.equal(lineTotal(recharge.price, 500000), 50000)
+  assert.equal(quantityWithUnit(500250, recharge.unit), '৳ 500.25')
+})
+test('legacy fixed-denomination recharge data migrates to monetary balances', () => {
+  const migrated = migrateShopState({
+    ...initialState,
+    version: undefined,
+    lines: [{ productId: 'milk', quantity: 2000 }, { productId: 'rice', quantity: 1000 }],
+  })
+  assert.equal(migrated.version, 2)
+  assert.deepEqual(migrated.lines, [
+    { productId: 'milk', quantity: 180000 },
+    { productId: 'rice', quantity: 1000 },
+  ])
+
+  const recharge = findProduct('milk')
+  const legacyReceipt = makeReceipt(initialState, 50000, 'cash')
+  legacyReceipt.lines = [{
+    productId: 'milk',
+    quantity: 1000,
+    product: { ...recharge, unit: 'pc', price: 9000, cost: 8800 },
+  }]
+  assert.equal(stockFor(recharge, [legacyReceipt]), recharge.stock - 90000)
 })
 test('cash sale records change, snapshots prices, and reduces stock', () => {
   const receipt = makeReceipt(initialState, 50000, 'cash')
@@ -151,4 +183,3 @@ test('customer provisioning, balance calculations, dues, loans, and credit adjus
   assert.equal(bal.totalPaid, 40000)
   assert.equal(bal.availableCredit, 954400)
 })
-

@@ -1,4 +1,4 @@
-import type { ShopState } from './model'
+import { migrateShopState, type ShopState } from './model'
 
 let database: Promise<IDBDatabase> | undefined
 function openDatabase() {
@@ -14,7 +14,10 @@ export async function loadState(): Promise<ShopState | undefined> {
   const db = await openDatabase()
   return new Promise((resolve, reject) => {
     const request = db.transaction('workspace').objectStore('workspace').get('state')
-    request.onsuccess = () => resolve(request.result as ShopState | undefined)
+    request.onsuccess = () => {
+      const saved = request.result as ShopState | undefined
+      resolve(saved ? migrateShopState(saved) : undefined)
+    }
     request.onerror = () => reject(request.error)
   })
 }

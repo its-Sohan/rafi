@@ -8,6 +8,7 @@ import {
   customerLedger,
   findProductIn,
   initialState,
+  isMoneyUnit,
   lineTotal,
   lineProfit,
   makeReceipt,
@@ -16,13 +17,14 @@ import {
   parseQuantity,
   productCost,
   products,
-  quantityText,
+  quantityWithUnit,
   stockFor,
   subtotal,
   receiptProfit,
   filterReceiptsByWindow,
   unitMargin,
   unitMarginPercent,
+  unitText,
   type Category,
   type Customer,
   type AccountTransaction,
@@ -42,6 +44,7 @@ type View = 'sales' | 'inventory' | 'accounts' | 'reports'
 type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | 'itemStats' | null
 const receiptNumber = (n: number) => String(n).padStart(4, '0')
 const dayKey = (date: string | Date) => new Date(date).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
+const rateText = (product: Product) => `৳ ${money(product.price)} / ${isMoneyUnit(product.unit) ? '৳1' : product.unit}`
 
 function Modal({ children, title, onClose, className = '', canClose = true }: { children: ReactNode; title: string; onClose: () => void; className?: string; canClose?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
@@ -532,7 +535,7 @@ export default function App() {
     setQuantityProduct(product)
     const variants = getSaleVariants(product)
     setSelectedVariant(variants[0] ?? product)
-    setQty('1')
+    setQty(isMoneyUnit((variants[0] ?? product).unit) ? '100' : '1')
     setInputError('')
     requestAnimationFrame(() => qtyRef.current?.focus())
   }
@@ -586,7 +589,7 @@ export default function App() {
       const key: Record<string, CopyKey> = { customer: 'customerRequired', overpayment: 'overpayment', empty: 'emptyError', amount: 'invalidAmount' }
       setModalError(t(key[(error as Error).message] ?? 'invalidAmount')); return
     }
-    const next: ShopState = { lines: [], discount: 0, customerId: null, receipts: [...state.receipts, receipt] }
+    const next: ShopState = { ...state, version: 2, lines: [], discount: 0, customerId: null, receipts: [...state.receipts, receipt] }
     paymentLock.current = true; setBusy(true)
     try {
       await saveState(next)
@@ -622,7 +625,7 @@ export default function App() {
     <p className="receipt-shop">{t('shop')}</p>
     <div className="receipt-meta"><span>#{receiptNumber(receipt.number)}</span><span>{new Date(receipt.createdAt).toLocaleString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'medium', timeStyle: 'short' })}</span></div>
     <p className="receipt-customer">{receipt.customer ? receipt.customer[lang] : t('walkIn')}</p>
-    <div className="receipt-items">{receipt.lines.map(l => <div key={l.productId}><span>{l.product[lang]}<small>{quantityText(l.quantity)} {l.product.unit} × {money(l.product.price)}</small></span><strong>{money(lineTotal(l.product.price, l.quantity))}</strong></div>)}</div>
+    <div className="receipt-items">{receipt.lines.map(l => <div key={l.productId}><span>{l.product[lang]}<small>{quantityWithUnit(l.quantity, l.product.unit)} × {rateText(l.product)}</small></span><strong>{money(lineTotal(l.product.price, l.quantity))}</strong></div>)}</div>
     <div className="receipt-total"><span>{t('subtotal')}</span><span>৳ {money(receipt.subtotal)}</span></div>
     {receipt.discount > 0 && <div className="receipt-total"><span>{t('discount')}</span><span>− {money(receipt.discount)}</span></div>}
     <div className="receipt-total grand"><strong>{t('total')}</strong><strong>৳ {money(receipt.total)}</strong></div>
@@ -679,7 +682,7 @@ export default function App() {
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>
             <div className="product-list" aria-label={t('products')}>
               {filtered.map((p, index) => <button key={p.id} ref={el => { productRefs.current[index] = el }} className={`product-row ${selected === index ? 'selected' : ''} ${quantityProduct?.id === p.id ? 'entering' : ''}`} onClick={() => { setSelected(index); chooseProduct(p) }} onFocus={() => setSelected(index)} onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))); productRefs.current[next]?.focus() } }}>
-                <ProductArt product={p}/><div className="product-info"><strong>{p[lang]}</strong><span><code>{p.code}</code><i/> {lang === 'en' ? p.detail : p.detailBn}</span></div><div className="product-price"><strong>{money(p.price)}</strong><span>৳ / {p.unit}</span></div><span className="row-enter">↵</span>
+                <ProductArt product={p}/><div className="product-info"><strong>{p[lang]}</strong><span><code>{p.code}</code><i/> {lang === 'en' ? p.detail : p.detailBn}</span></div><div className="product-price"><strong>{money(p.price)}</strong><span>{isMoneyUnit(p.unit) ? t('perTaka') : `৳ / ${p.unit}`}</span></div><span className="row-enter">↵</span>
               </button>)}
               {!filtered.length && <div className="empty-state"><Icon name="search" size={30}/><h3>{t('noResults')}</h3><p>{t('noResultsHint')}</p></div>}
             </div>
@@ -703,7 +706,7 @@ export default function App() {
                 return (
                   <form onSubmit={e => { e.preventDefault(); addProduct() }} onKeyDown={handleLaneKeyDown}>
                     <div className="quantity-product-label">
-                      <span className="eyebrow">{t('qtyFor')} <code>{currentVariant.code}</code></span>
+                      <span className="eyebrow">{isMoneyUnit(currentVariant.unit) ? t('topUpAmount') : t('qtyFor')} <code>{currentVariant.code}</code></span>
                       <strong>{quantityProduct[lang]}</strong>
                       {hasVariants && (
                         <div className="variant-chips" style={{ marginTop: 4 }}>
@@ -728,7 +731,7 @@ export default function App() {
                       </div>
                     )}
                     <label className="quantity-field">
-                      <span className="sr-only">{t('quantity')}</span>
+                      <span className="sr-only">{isMoneyUnit(currentVariant.unit) ? t('topUpAmount') : t('quantity')}</span>
                       <input
                         ref={qtyRef}
                         value={qty}
@@ -737,7 +740,7 @@ export default function App() {
                         aria-describedby={inputError ? 'qty-error' : undefined}
                         aria-invalid={!!inputError}
                       />
-                      <span>{currentVariant.unit}</span>
+                      <span>{unitText(currentVariant.unit)}</span>
                     </label>
                     <button className="add-button" type="submit" aria-label={t('addItem')}>
                       <Icon name="arrow" size={21}/><kbd>↵</kbd>
@@ -761,8 +764,8 @@ export default function App() {
               if (e.key === 'Delete' && state.lines[billSelection]) { e.preventDefault(); removeLine(billSelection) }
             }}>
               {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} data-product-id={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
-                <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{money(p.price)} / {p.unit}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
-                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}>{quantityText(line.quantity)}<span>{p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
+                <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{rateText(p)}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
+                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}>{quantityWithUnit(line.quantity, p.unit)}<span>{isMoneyUnit(p.unit) ? t('topUp') : p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
               </div> })}
               {!state.lines.length && <div className="empty-state bill-empty"><div className="empty-pixel"><PixelMark/></div><h3>{t('emptyBill')}</h3><p>{t('emptyBillHint')}</p><button className="text-button" onClick={goSearch}>{t('findItem')} <kbd>F2</kbd></button></div>}
               {state.lines.length > 0 && <div className="bill-end"><span/><Icon name="plus" size={13}/><span/></div>}
@@ -825,11 +828,11 @@ export default function App() {
               return <tr key={p.id} className={p.archived ? 'product-discontinued' : undefined}>
                 <td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td>
                 <td><code>{p.code}</code></td>
-                <td>{quantityText(stockFor(p, state.receipts))} <small>{p.unit}</small></td>
+                <td>{quantityWithUnit(stockFor(p, state.receipts), p.unit)}</td>
                 <td>৳ {money(cost)}</td>
                 <td>৳ {money(p.price)}</td>
                 <td><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
-                <td>{quantityText(purchased)} <small>{p.unit}</small></td>
+                <td>{quantityWithUnit(purchased, p.unit)}</td>
                 <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{p.archived ? 'Discontinued' : 'Active'}</span></td>
                 <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{p.archived ? 'Restore' : 'Discontinue'}</button></td>
               </tr>
@@ -910,7 +913,7 @@ export default function App() {
                             </div>
                           </td>
                           <td><code>{p.code}</code></td>
-                          <td><strong>{quantityText(units)}</strong> <small>{p.unit}</small></td>
+                          <td><strong>{quantityWithUnit(units, p.unit)}</strong></td>
                           <td>৳ {money(revenue)}</td>
                           <td><span className="profit-text">৳ {money(profit)}</span></td>
                           <td>
@@ -961,7 +964,10 @@ export default function App() {
 
       {dialog === 'discount' && <form onSubmit={e => { e.preventDefault(); const value = parseMoney(discountInput); if (value === null) { setModalError(t('invalidAmount')); return } if (value >= billSubtotal) { setModalError(t('discountInvalid')); return } setState(s => ({ ...s, discount: value })); closeDialog() }}><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('discountTitle')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('discountHint')}</p><label className="field-label" htmlFor="discount">{t('discount')} · BDT</label><div className="money-input"><span>৳</span><input id="discount" value={discountInput} onChange={e => { setDiscountInput(e.target.value); setModalError('') }} inputMode="decimal" placeholder="0.00"/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('apply')}<kbd>↵</kbd></button></div></form>}
 
-      {dialog === 'edit' && state.lines[billSelection] && <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{findItem(state.lines[billSelection].productId)[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{t('quantity')} · {findItem(state.lines[billSelection].productId).unit}</label><div className="money-input"><input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>}
+      {dialog === 'edit' && state.lines[billSelection] && (() => {
+        const editProduct = findItem(state.lines[billSelection].productId)
+        return <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{editProduct[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{isMoneyUnit(editProduct.unit) ? t('topUpAmount') : t('quantity')} · {unitText(editProduct.unit)}</label><div className="money-input">{isMoneyUnit(editProduct.unit) && <span>৳</span>}<input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>
+      })()}
 
       {dialog === 'clear' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('clearTitle')}</h3><p className="modal-description">{t('clearHint')}</p><div className="dialog-actions"><button className="secondary-button" data-initial-focus onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" onClick={() => { setState(s => ({ ...s, lines: [], discount: 0, customerId: null })); closeDialog(); goSearch() }}>{t('confirmClear')}</button></div></>}
 
@@ -1033,20 +1039,21 @@ export default function App() {
               <option value="kg">kg (Kilogram)</option>
               <option value="pc">pc (Piece / Packet)</option>
               <option value="L">L (Litre)</option>
+              <option value="BDT">৳ BDT (Recharge / monetary service)</option>
             </select>
           </div>
           {!hasVariants && (
             <>
               <div className="form-group">
-                <label htmlFor="item-purchased">{t('purchasedQty')} ({newUnit}) *</label>
+                <label htmlFor="item-purchased">{isMoneyUnit(newUnit) ? t('openingRechargeBalance') : t('purchasedQty')} ({unitText(newUnit)}) *</label>
                 <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
               </div>
               <div className="form-group">
-                <label htmlFor="item-cost">{t('costPrice')} (৳) *</label>
+                <label htmlFor="item-cost">{isMoneyUnit(newUnit) ? t('costPerTaka') : t('costPrice')} (৳) *</label>
                 <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 20.00" required/>
               </div>
               <div className="form-group">
-                <label htmlFor="item-price">{t('sellingPrice')} (৳) *</label>
+                <label htmlFor="item-price">{isMoneyUnit(newUnit) ? t('chargePerTaka') : t('sellingPrice')} (৳) *</label>
                 <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder="e.g. 25.00" required/>
               </div>
             </>
@@ -1174,19 +1181,19 @@ export default function App() {
               <div className="restock-grid">
                 <div>
                   <small>{t('currentStockLabel')}</small>
-                  <strong>{quantityText(currentStock)} {existingItem.unit} @ ৳ {money(currentUnitCost)}</strong>
+                  <strong>{quantityWithUnit(currentStock, existingItem.unit)} @ {rateText({ ...existingItem, price: currentUnitCost })}</strong>
                 </div>
                 <div>
                   <small>{t('incomingStockLabel')}</small>
-                  <strong>+{quantityText(incomingQty)} {newUnit} @ ৳ {money(c)}</strong>
+                  <strong>+{quantityWithUnit(incomingQty, newUnit)} @ ৳ {money(c)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
                 </div>
                 <div>
                   <small>{t('blendedCostLabel')}</small>
-                  <strong>৳ {money(blendedCost)} / {newUnit}</strong>
+                  <strong>৳ {money(blendedCost)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
                 </div>
                 <div>
                   <small>{t('newStockLabel')}</small>
-                  <strong>{quantityText(totalStock)} {newUnit}</strong>
+                  <strong>{quantityWithUnit(totalStock, newUnit)}</strong>
                 </div>
               </div>
               <div className="margin-preview" style={{ marginTop: '10px' }}>
@@ -1400,7 +1407,7 @@ export default function App() {
               <h3>{p[lang]}<span className="heading-dot">.</span></h3>
               <p>
                 <code>{p.code}</code> · {hasVariants ? `${variants.length} ${t('variants')}` : (lang === 'en' ? p.detail : p.detailBn)}
-                {!hasVariants && ` · ৳ ${money(p.price)} / ${p.unit}`}
+                {!hasVariants && ` · ${rateText(p)}`}
               </p>
             </div>
           </div>
@@ -1408,7 +1415,7 @@ export default function App() {
           <div className="customer-stats-grid">
             <div className="customer-stat-card">
               <span>{t('unitsSold')}</span>
-              <strong>{quantityText(totalSoldUnits)} <small>{p.unit}</small></strong>
+              <strong>{quantityWithUnit(totalSoldUnits, p.unit)}</strong>
             </div>
             <div className="customer-stat-card">
               <span>{t('itemRevenue')}</span>
@@ -1424,11 +1431,11 @@ export default function App() {
             <div className="item-detail-cards-grid">
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('cost')}</span>
-                <strong>৳ {money(cost)} / {p.unit}</strong>
+                <strong>৳ {money(cost)} / {isMoneyUnit(p.unit) ? '৳1' : p.unit}</strong>
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('sellingPrice')}</span>
-                <strong>৳ {money(p.price)} / {p.unit}</strong>
+                <strong>{rateText(p)}</strong>
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('unitMargin')}</span>
@@ -1436,7 +1443,7 @@ export default function App() {
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('stock')}</span>
-                <strong>{quantityText(stockFor(p, state.receipts))} {p.unit}</strong>
+                <strong>{quantityWithUnit(stockFor(p, state.receipts), p.unit)}</strong>
               </div>
             </div>
           ) : (
@@ -1473,8 +1480,8 @@ export default function App() {
                         </td>
                         <td>৳ {money(vCost)}</td>
                         <td>৳ {money(v.price)}</td>
-                        <td>{quantityText(stockFor(v, state.receipts))} <small>{v.unit}</small></td>
-                        <td><strong>{quantityText(vStat?.units ?? 0)}</strong> <small>{v.unit}</small></td>
+                        <td>{quantityWithUnit(stockFor(v, state.receipts), v.unit)}</td>
+                        <td><strong>{quantityWithUnit(vStat?.units ?? 0, v.unit)}</strong></td>
                         <td>৳ {money(vStat?.revenue ?? 0)}</td>
                         <td><span className="profit-text">+৳ {money(vStat?.profit ?? 0)}</span></td>
                       </tr>
@@ -1525,7 +1532,7 @@ export default function App() {
                     <td><small>{new Date(sale.time).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short' })} {new Date(sale.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</small></td>
                     <td>{sale.customerName}</td>
                     {hasVariants && <td><small>{lang === 'bn' ? (sale.product.variantNameBn ?? sale.product.variantName ?? sale.product.detailBn) : (sale.product.variantName ?? sale.product.detail)}</small></td>}
-                    <td><strong>{quantityText(sale.quantity)}</strong> <small>{sale.product.unit}</small></td>
+                    <td><strong>{quantityWithUnit(sale.quantity, sale.product.unit)}</strong></td>
                     <td>৳ {money(sale.total)}</td>
                     <td><span className="profit-text">+ ৳ {money(sale.profit)}</span></td>
                   </tr>

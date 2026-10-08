@@ -1,8 +1,9 @@
 export type Lang = 'en' | 'bn'
 export type Category = 'recent' | 'all' | 'staples' | 'fresh' | 'household'
+export type ProductUnit = 'kg' | 'pc' | 'L' | 'BDT'
 export type Product = {
   id: string; code: string; en: string; bn: string; detail: string; detailBn: string
-  category: Exclude<Category, 'all' | 'recent'>; unit: 'kg' | 'pc' | 'L'; price: number; stock: number
+  category: Exclude<Category, 'all' | 'recent'>; unit: ProductUnit; price: number; stock: number
   cost?: number // Wholesale / purchase cost per unit in poisha (minor currency unit: 1 BDT = 100 poisha)
   purchased?: number // Total units purchased / provisioned (scaled integer: 1 unit = 1000)
   groupId?: string // Identifier linking variants of the same product (e.g. 'egg', 'soap')
@@ -50,6 +51,7 @@ export type Receipt = {
 }
 
 export type ShopState = {
+  version?: 2
   lines: Line[]
   discount: number
   customerId: string | null
@@ -63,7 +65,7 @@ export const products: Product[] = [
   { id: 'oil', code: '102', en: 'Blue ball pen', bn: 'নীল বলপেন', detail: 'Smooth writing · each', detailBn: 'মসৃণ লেখা · প্রতি পিস', category: 'staples', unit: 'pc', price: 1800, cost: 1200, stock: 48000, purchased: 48000, art: 'pen', color: '#e4eaff' },
   { id: 'egg', code: '103', en: 'HB pencil', bn: 'এইচবি পেন্সিল', detail: 'Wooden · each', detailBn: 'কাঠের · প্রতি পিস', category: 'staples', unit: 'pc', price: 1200, cost: 800, stock: 180000, purchased: 180000, art: 'pencil', color: '#f2dfce' },
   { id: 'egg-white', code: '103W', en: 'Black ball pen', bn: 'কালো বলপেন', detail: 'Fine tip · each', detailBn: 'সরু নিব · প্রতি পিস', category: 'staples', unit: 'pc', price: 1000, cost: 700, stock: 120000, purchased: 120000, art: 'pen', color: '#fffdfa' },
-  { id: 'milk', code: '104', en: 'Mobile recharge · ৳90', bn: 'মোবাইল রিচার্জ · ৯০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 9000, cost: 8800, stock: 24000, purchased: 24000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'milk', code: '104', en: 'Mobile recharge', bn: 'মোবাইল রিচার্জ', detail: 'All operators · enter amount', detailBn: 'সব অপারেটর · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 98, stock: 24000000, purchased: 24000000, art: 'recharge', color: '#e0e8f0' },
   { id: 'sugar', code: '105', en: 'Class notebook', bn: 'ক্লাসের খাতা', detail: '120 pages · ruled', detailBn: '১২০ পৃষ্ঠা · দাগ টানা', category: 'staples', unit: 'pc', price: 13500, cost: 11500, stock: 65000, purchased: 65000, art: 'notebook', color: '#e6e5ee' },
   { id: 'tea', code: '106', en: 'Drawing book', bn: 'ড্রয়িং খাতা', detail: 'A4 · 40 sheets', detailBn: 'এ ফোর · ৪০ পাতা', category: 'staples', unit: 'pc', price: 11000, cost: 9000, stock: 32000, purchased: 32000, art: 'book', color: '#dee9d8' },
   { id: 'soap', code: '107', en: 'Eraser', bn: 'রাবার', detail: 'Soft · each', detailBn: 'নরম · প্রতি পিস', category: 'staples', unit: 'pc', price: 4500, cost: 3000, stock: 56000, purchased: 56000, art: 'daily', color: '#e5ebc9' },
@@ -71,9 +73,9 @@ export const products: Product[] = [
   { id: 'flour', code: '109', en: '30 cm ruler', bn: '৩০ সেমি স্কেল', detail: 'Clear plastic · each', detailBn: 'স্বচ্ছ প্লাস্টিক · প্রতি পিস', category: 'staples', unit: 'pc', price: 6000, cost: 4000, stock: 44000, purchased: 44000, art: 'daily', color: '#eae0cf' },
   { id: 'lentil', code: '110', en: 'Glue stick', bn: 'গ্লু স্টিক', detail: 'Small · each', detailBn: 'ছোট · প্রতি পিস', category: 'staples', unit: 'pc', price: 12000, cost: 9000, stock: 38000, purchased: 38000, art: 'daily', color: '#f0d7c6' },
   { id: 'biscuit', code: '111', en: 'Potato chips', bn: 'আলুর চিপস', detail: 'Small packet · each', detailBn: 'ছোট প্যাকেট · প্রতি পিস', category: 'household', unit: 'pc', price: 3000, cost: 2200, stock: 18000, purchased: 18000, art: 'snack', color: '#eaddba' },
-  { id: 'salt', code: '112', en: 'Mobile recharge · ৳50', bn: 'মোবাইল রিচার্জ · ৫০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 5000, cost: 4900, stock: 40000, purchased: 40000, art: 'recharge', color: '#d8e8ed' },
-  { id: 'recharge-20', code: '113', en: 'Mobile recharge · ৳20', bn: 'মোবাইল রিচার্জ · ২০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 2000, cost: 1960, stock: 50000, purchased: 50000, art: 'recharge', color: '#e0e8f0' },
-  { id: 'recharge-100', code: '114', en: 'Mobile recharge · ৳100', bn: 'মোবাইল রিচার্জ · ১০০ টাকা', detail: 'All operators · top-up', detailBn: 'সব অপারেটর · টপ-আপ', category: 'fresh', unit: 'pc', price: 10000, cost: 9800, stock: 20000, purchased: 20000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'salt', code: '112', en: 'Electricity meter top-up', bn: 'বিদ্যুৎ মিটার টপ-আপ', detail: 'Prepaid meter · enter amount', detailBn: 'প্রিপেইড মিটার · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 99, stock: 40000000, purchased: 40000000, art: 'recharge', color: '#d8e8ed' },
+  { id: 'recharge-20', code: '113', en: 'Internet recharge', bn: 'ইন্টারনেট রিচার্জ', detail: 'Broadband or data · enter amount', detailBn: 'ব্রডব্যান্ড বা ডাটা · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 97, stock: 50000000, purchased: 50000000, art: 'recharge', color: '#e0e8f0' },
+  { id: 'recharge-100', code: '114', en: 'TV recharge', bn: 'টিভি রিচার্জ', detail: 'DTH or cable · enter amount', detailBn: 'ডিটিএইচ বা কেবল · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 98, stock: 20000000, purchased: 20000000, art: 'recharge', color: '#e0e8f0' },
   { id: 'khata-small', code: '115', en: 'Pocket notebook', bn: 'পকেট নোটবুক', detail: '40 pages · each', detailBn: '৪০ পৃষ্ঠা · প্রতি পিস', category: 'staples', unit: 'pc', price: 2500, cost: 1700, stock: 30000, purchased: 30000, art: 'notebook', color: '#f1e4ca' },
   { id: 'biscuit-water', code: '116', en: 'Bottled water · 500 ml', bn: 'বোতলজাত পানি · ৫০০ মি.লি.', detail: 'Sealed bottle · each', detailBn: 'সিল করা বোতল · প্রতি পিস', category: 'household', unit: 'pc', price: 2000, cost: 1200, stock: 24000, purchased: 24000, art: 'daily', color: '#d8e8ed' },
 ]
@@ -83,7 +85,8 @@ export const customers: Customer[] = [
   { id: 'c3', en: 'Shila Begum', bn: 'শীলা বেগম', phone: '01700 000103', creditLimit: 200000 },
 ]
 export const initialState: ShopState = {
-  lines: [{ productId: 'rice', quantity: 2000 }, { productId: 'egg', quantity: 6000 }, { productId: 'milk', quantity: 1000 }],
+  version: 2,
+  lines: [{ productId: 'rice', quantity: 2000 }, { productId: 'egg', quantity: 6000 }, { productId: 'milk', quantity: 90000 }],
   discount: 0, customerId: null, receipts: [], customCustomers: [], transactions: [],
 }
 export const allProducts = (custom?: Product[]) => {
@@ -179,10 +182,28 @@ export function receiptProfit(receipt: Receipt): number {
 export const subtotal = (lines: Line[], catalog: Product[] = products) => lines.reduce((sum, line) => sum + lineTotal(findProductIn(line.productId, catalog).price, line.quantity), 0)
 export const money = (minor: number) => (minor / 100).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 export const quantityText = (scaled: number) => (scaled / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })
+export const isMoneyUnit = (unit: ProductUnit) => unit === 'BDT'
+export const unitText = (unit: ProductUnit) => isMoneyUnit(unit) ? '৳' : unit
+export const quantityWithUnit = (scaled: number, unit: ProductUnit) => isMoneyUnit(unit)
+  ? `৳ ${money(Math.round(scaled / 10))}`
+  : `${quantityText(scaled)} ${unit}`
+const legacyRechargeValues: Record<string, number> = { milk: 90, salt: 50, 'recharge-20': 20, 'recharge-100': 100 }
+export function migrateShopState(state: ShopState): ShopState {
+  if (state.version === 2) return state
+  return {
+    ...state,
+    version: 2,
+    lines: state.lines.map(line => legacyRechargeValues[line.productId]
+      ? { ...line, quantity: line.quantity * legacyRechargeValues[line.productId] }
+      : line),
+  }
+}
 export function parseQuantity(value: string, unit: Product['unit']): number | null {
-  if (!/^\d+(\.\d{1,3})?$/.test(value.trim())) return null
+  const pattern = isMoneyUnit(unit) ? /^\d+(\.\d{1,2})?$/ : /^\d+(\.\d{1,3})?$/
+  if (!pattern.test(value.trim())) return null
   const scaled = Math.round(Number(value) * 1000)
-  if (scaled <= 0 || scaled > 10000000 || (unit === 'pc' && scaled % 1000 !== 0)) return null
+  const maximum = isMoneyUnit(unit) ? 1000000000 : 10000000
+  if (scaled <= 0 || scaled > maximum || (unit === 'pc' && scaled % 1000 !== 0)) return null
   return scaled
 }
 export function parseMoney(value: string): number | null {
@@ -191,7 +212,14 @@ export function parseMoney(value: string): number | null {
   return Number.isSafeInteger(amount) && amount <= 100000000 ? amount : null
 }
 export function stockFor(product: Product, receipts: Receipt[]) {
-  return product.stock - receipts.reduce((sum, receipt) => sum + receipt.lines.filter(l => l.productId === product.id).reduce((q, l) => q + l.quantity, 0), 0)
+  return product.stock - receipts.reduce((sum, receipt) => sum + receipt.lines.filter(l => l.productId === product.id).reduce((quantity, line) => {
+    // Receipts snapshot their original product. Convert legacy fixed-denomination
+    // recharge pieces to their monetary value when reading the new BDT balance.
+    if (isMoneyUnit(product.unit) && !isMoneyUnit(line.product.unit)) {
+      return quantity + lineTotal(line.product.price, line.quantity) * 10
+    }
+    return quantity + line.quantity
+  }, 0), 0)
 }
 export function makeReceipt(state: ShopState, tendered: number, method: Receipt['method']): Receipt {
   const catalog = allProducts(state.customProducts)
