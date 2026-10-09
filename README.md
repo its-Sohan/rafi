@@ -1,4 +1,4 @@
-# Hisab — keyboard-first shop counter
+# Hisab — computer and mobile shop counter
 
 A working UI prototype for a single shop and selling device. Built with React, TypeScript, and Vite, with Cloudflare Workers Static Assets configuration.
 
@@ -28,12 +28,14 @@ The service worker is enabled in production only. Load the production preview on
 
 ## Try the keyboard flow
 
-The first launch includes demo products and a sample draft bill. All receipts are explicitly marked as local demo receipts.
+The first launch starts with an empty bill and an example catalog for a Bangladeshi computer and mobile sales and service shop. Prices and stock quantities are illustrative; enter your real figures before using the counter for live sales. Receipts are saved on this device.
 
-1. Press **F2**, enter `105`, and press **Enter**.
-2. Enter `0.750` and press **Enter** to add 750 g of sugar.
-3. Press numpad **+** to open payment.
-4. Enter the amount received and press **Enter** to confirm.
+The catalog includes CCTV equipment, desktop power supplies, USB drives, mobile chargers, headphones, and everyday accessories. Routers, USB drives, chargers, CCTV cameras, power supplies, and headphones have separately stocked brand variants. Search a family code such as `C207` to choose a router, or a variant code such as `C207-T` for Tenda.
+
+1. Press **F2**, enter `A302`, and press **Enter**.
+2. Enter `2` and press **Enter** to add two USB-C cables.
+3. Search for `S404` and add one laptop cleaning service. Service labour does not use inventory stock.
+4. Press numpad **+** to open payment, enter the amount received, and press **Enter**.
 5. The receipt is saved before success is displayed; press **Enter** again for the next sale.
 
 | Key | Action |
@@ -51,12 +53,13 @@ The first launch includes demo products and a sample draft bill. All receipts ar
 
 ## Implemented
 
-- Code/name search and category filtering; distinct numeric codes for variants.
+- Code/name search and mobile, computer, accessory, and service categories; distinct codes for variants.
 - Fractional quantities to three decimals; pieces require whole numbers.
 - Bill editing, removal/undo, fixed discounts, customer selection, cash/mobile/bank payment recording, change, and customer dues.
 - Integer money and scaled quantities, with rounding at the line boundary.
 - IndexedDB drafts and receipts; serialized writes and atomic sale/draft transition. A failed save leaves the draft intact.
-- Local receipt history, stock reduced by recorded sales, customer balances, daily totals using Asia/Dhaka, receipt printing, JSON backup export, and sales CSV export.
+- Local receipt history, stock reduced by product sales, service charges without stock tracking, customer balances, daily totals using Asia/Dhaka, receipt printing, JSON backup export, and sales CSV export.
+- Existing browser data migrates on the next load. Previous receipts, customer dues, user-added products, and non-demo draft lines are retained; the old prefilled sample bill is cleared. Prior built-in products still referenced by a draft remain archived with their original prices.
 - Production service worker caches the application and fonts for offline reopening. The cashier still records sales in IndexedDB.
 - Responsive layouts for 1366×768, 1920×1080, and a stacked small-screen view.
 
@@ -67,11 +70,11 @@ npm run build
 npm test
 ```
 
-Model tests cover weighted totals, quantity validation, cash change, customer dues, electronic overpayment rejection, stock movement, and invalid checkout. Browser verification covers keyboard product entry, fractional quantity entry, payment validation, discounts and customer balances, receipt persistence after reload, and both interface languages. The production app was reloaded and a sale completed with its preview server stopped, then reloaded again to verify the offline receipt persisted.
+Model tests cover catalog integrity, quantities, payments, service labour, stock movement, customer dues, search, and migration of saved browser data. The browser flow should be checked with both interface languages after changing the catalog.
 
 ## Next phase
 
-This is a local UI prototype. It has no authentication, Cloudflare D1 binding, server API, or cloud synchronization. Catalog and customers are demo data. Product editing, purchases, expenses, supplier accounts, returns/reversals, and customer collections are not implemented yet. Cash/mobile/bank buttons record a method; they do not process payments.
+This is a local UI prototype. It has no authentication, Cloudflare D1 binding, server API, or cloud synchronization. The catalog contains example products and services; no sample customers are created for new workspaces. Purchase orders, expenses, supplier accounts, returns/reversals, and repair job tickets are not implemented yet. Cash/mobile/bank buttons record a method; they do not process payments.
 
 Connect the tested UI to an authenticated Worker API and D1. Add a durable outbox in the same IndexedDB transaction as each sale, a unique operation ID, and idempotent server commits for receipt, payment, and stock records. Surface pending/failed synchronization and keep historical price snapshots. Backend work should preserve the existing keyboard and focus behavior.
 

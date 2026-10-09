@@ -1,6 +1,7 @@
 export type Lang = 'en' | 'bn'
-export type Category = 'recent' | 'all' | 'staples' | 'fresh' | 'household'
-export type ProductUnit = 'kg' | 'pc' | 'L' | 'BDT'
+export type Category = 'recent' | 'all' | 'mobiles' | 'computers' | 'accessories' | 'services' | 'staples' | 'fresh' | 'household'
+export type ShopCategory = 'mobiles' | 'computers' | 'accessories' | 'services'
+export type ProductUnit = 'kg' | 'pc' | 'L' | 'BDT' | 'job'
 export type Product = {
   id: string; code: string; en: string; bn: string; detail: string; detailBn: string
   category: Exclude<Category, 'all' | 'recent'>; unit: ProductUnit; price: number; stock: number
@@ -10,7 +11,8 @@ export type Product = {
   variantName?: string // Short variant name for inline picker e.g. 'Brown' / 'White'
   variantNameBn?: string // Bengali variant name e.g. 'লাল' / 'সাদা'
   archived?: boolean // Discontinued and hidden from the sales catalog
-  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily'
+  trackStock?: boolean // False for labour/services that do not consume a stocked unit
+  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily' | 'phone' | 'featurePhone' | 'laptop' | 'desktop' | 'monitor' | 'chip' | 'charger' | 'cable' | 'headphones' | 'battery' | 'mouse' | 'keyboard' | 'repair' | 'router' | 'cctv' | 'psu' | 'usbDrive'
   color: string
 }
 export type Line = { productId: string; quantity: number }
@@ -51,7 +53,7 @@ export type Receipt = {
 }
 
 export type ShopState = {
-  version?: 2
+  version?: 2 | 3
   lines: Line[]
   discount: number
   customerId: string | null
@@ -60,33 +62,102 @@ export type ShopState = {
   customCustomers?: Customer[]
   transactions?: AccountTransaction[]
 }
-export const products: Product[] = [
-  { id: 'rice', code: '101', en: 'Exercise book', bn: 'এক্সারসাইজ খাতা', detail: '80 pages · ruled', detailBn: '৮০ পৃষ্ঠা · দাগ টানা', category: 'staples', unit: 'pc', price: 7200, cost: 6200, stock: 125000, purchased: 125000, art: 'book', color: '#e8e4d8' },
-  { id: 'oil', code: '102', en: 'Blue ball pen', bn: 'নীল বলপেন', detail: 'Smooth writing · each', detailBn: 'মসৃণ লেখা · প্রতি পিস', category: 'staples', unit: 'pc', price: 1800, cost: 1200, stock: 48000, purchased: 48000, art: 'pen', color: '#e4eaff' },
-  { id: 'egg', code: '103', en: 'HB pencil', bn: 'এইচবি পেন্সিল', detail: 'Wooden · each', detailBn: 'কাঠের · প্রতি পিস', category: 'staples', unit: 'pc', price: 1200, cost: 800, stock: 180000, purchased: 180000, art: 'pencil', color: '#f2dfce' },
-  { id: 'egg-white', code: '103W', en: 'Black ball pen', bn: 'কালো বলপেন', detail: 'Fine tip · each', detailBn: 'সরু নিব · প্রতি পিস', category: 'staples', unit: 'pc', price: 1000, cost: 700, stock: 120000, purchased: 120000, art: 'pen', color: '#fffdfa' },
-  { id: 'milk', code: '104', en: 'Mobile recharge', bn: 'মোবাইল রিচার্জ', detail: 'All operators · enter amount', detailBn: 'সব অপারেটর · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 98, stock: 24000000, purchased: 24000000, art: 'recharge', color: '#e0e8f0' },
-  { id: 'sugar', code: '105', en: 'Class notebook', bn: 'ক্লাসের খাতা', detail: '120 pages · ruled', detailBn: '১২০ পৃষ্ঠা · দাগ টানা', category: 'staples', unit: 'pc', price: 13500, cost: 11500, stock: 65000, purchased: 65000, art: 'notebook', color: '#e6e5ee' },
-  { id: 'tea', code: '106', en: 'Drawing book', bn: 'ড্রয়িং খাতা', detail: 'A4 · 40 sheets', detailBn: 'এ ফোর · ৪০ পাতা', category: 'staples', unit: 'pc', price: 11000, cost: 9000, stock: 32000, purchased: 32000, art: 'book', color: '#dee9d8' },
-  { id: 'soap', code: '107', en: 'Eraser', bn: 'রাবার', detail: 'Soft · each', detailBn: 'নরম · প্রতি পিস', category: 'staples', unit: 'pc', price: 4500, cost: 3000, stock: 56000, purchased: 56000, art: 'daily', color: '#e5ebc9' },
-  { id: 'soap-rose', code: '108', en: 'Pencil sharpener', bn: 'পেন্সিল কাটার', detail: 'Metal blade · each', detailBn: 'ধাতব ব্লেড · প্রতি পিস', category: 'staples', unit: 'pc', price: 4500, cost: 3000, stock: 38000, purchased: 38000, art: 'daily', color: '#f0dce1' },
-  { id: 'flour', code: '109', en: '30 cm ruler', bn: '৩০ সেমি স্কেল', detail: 'Clear plastic · each', detailBn: 'স্বচ্ছ প্লাস্টিক · প্রতি পিস', category: 'staples', unit: 'pc', price: 6000, cost: 4000, stock: 44000, purchased: 44000, art: 'daily', color: '#eae0cf' },
-  { id: 'lentil', code: '110', en: 'Glue stick', bn: 'গ্লু স্টিক', detail: 'Small · each', detailBn: 'ছোট · প্রতি পিস', category: 'staples', unit: 'pc', price: 12000, cost: 9000, stock: 38000, purchased: 38000, art: 'daily', color: '#f0d7c6' },
-  { id: 'biscuit', code: '111', en: 'Potato chips', bn: 'আলুর চিপস', detail: 'Small packet · each', detailBn: 'ছোট প্যাকেট · প্রতি পিস', category: 'household', unit: 'pc', price: 3000, cost: 2200, stock: 18000, purchased: 18000, art: 'snack', color: '#eaddba' },
-  { id: 'salt', code: '112', en: 'Electricity meter top-up', bn: 'বিদ্যুৎ মিটার টপ-আপ', detail: 'Prepaid meter · enter amount', detailBn: 'প্রিপেইড মিটার · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 99, stock: 40000000, purchased: 40000000, art: 'recharge', color: '#d8e8ed' },
-  { id: 'recharge-20', code: '113', en: 'Internet recharge', bn: 'ইন্টারনেট রিচার্জ', detail: 'Broadband or data · enter amount', detailBn: 'ব্রডব্যান্ড বা ডাটা · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 97, stock: 50000000, purchased: 50000000, art: 'recharge', color: '#e0e8f0' },
-  { id: 'recharge-100', code: '114', en: 'TV recharge', bn: 'টিভি রিচার্জ', detail: 'DTH or cable · enter amount', detailBn: 'ডিটিএইচ বা কেবল · টাকার পরিমাণ দিন', category: 'fresh', unit: 'BDT', price: 100, cost: 98, stock: 20000000, purchased: 20000000, art: 'recharge', color: '#e0e8f0' },
-  { id: 'khata-small', code: '115', en: 'Pocket notebook', bn: 'পকেট নোটবুক', detail: '40 pages · each', detailBn: '৪০ পৃষ্ঠা · প্রতি পিস', category: 'staples', unit: 'pc', price: 2500, cost: 1700, stock: 30000, purchased: 30000, art: 'notebook', color: '#f1e4ca' },
-  { id: 'biscuit-water', code: '116', en: 'Bottled water · 500 ml', bn: 'বোতলজাত পানি · ৫০০ মি.লি.', detail: 'Sealed bottle · each', detailBn: 'সিল করা বোতল · প্রতি পিস', category: 'household', unit: 'pc', price: 2000, cost: 1200, stock: 24000, purchased: 24000, art: 'daily', color: '#d8e8ed' },
-]
-export const customers: Customer[] = [
+type Seed = [id: string, code: string, en: string, bn: string, detail: string, detailBn: string,
+  category: ShopCategory, priceTaka: number, costTaka: number, units: number, art: Product['art'], color: string,
+  groupId?: string, variantName?: string, variantNameBn?: string]
+const seedProduct = ([id, code, en, bn, detail, detailBn, category, priceTaka, costTaka, units, art, color, groupId, variantName, variantNameBn]: Seed): Product => ({
+  id, code, en, bn, detail, detailBn, category, unit: category === 'services' ? 'job' : 'pc',
+  price: priceTaka * 100, cost: costTaka * 100, stock: units * 1000, purchased: units * 1000,
+  trackStock: category !== 'services', art, color, groupId, variantName, variantNameBn,
+})
+
+// Illustrative Bangladesh shop catalog. Replace prices and stock with actual shop figures before use.
+export const products: Product[] = ([
+  ['mobile-6-128', 'M101', 'Android smartphone · 6/128 GB', 'অ্যান্ড্রয়েড ফোন · ৬/১২৮ জিবি', 'Dual SIM · 4G', 'ডুয়াল সিম · ৪জি', 'mobiles', 16990, 15300, 8, 'phone', '#e5eaf4'],
+  ['mobile-8-256', 'M102', 'Android smartphone · 8/256 GB', 'অ্যান্ড্রয়েড ফোন · ৮/২৫৬ জিবি', 'Dual SIM · 5G', 'ডুয়াল সিম · ৫জি', 'mobiles', 24990, 22600, 6, 'phone', '#e7e2f1'],
+  ['feature-dual', 'M103', 'Feature phone · dual SIM', 'বাটন ফোন · ডুয়াল সিম', 'Basic calling and SMS', 'কল ও এসএমএস', 'mobiles', 1890, 1450, 18, 'featurePhone', '#e5e9dd'],
+  ['feature-4g', 'M104', '4G feature phone', '৪জি বাটন ফোন', 'Dual SIM · 4G', 'ডুয়াল সিম · ৪জি', 'mobiles', 3190, 2690, 10, 'featurePhone', '#e0e8ef'],
+  ['laptop-office', 'C201', 'Office laptop · 8/256 GB', 'অফিস ল্যাপটপ · ৮/২৫৬ জিবি', '8 GB RAM · 256 GB SSD', '৮ জিবি র‍্যাম · ২৫৬ জিবি এসএসডি', 'computers', 48900, 45300, 4, 'laptop', '#e3e9ed'],
+  ['laptop-advanced', 'C202', 'Laptop · 16/512 GB', 'ল্যাপটপ · ১৬/৫১২ জিবি', '16 GB RAM · 512 GB SSD', '১৬ জিবি র‍্যাম · ৫১২ জিবি এসএসডি', 'computers', 68900, 64800, 3, 'laptop', '#e4e4eb'],
+  ['desktop-office', 'C203', 'Desktop PC · 8/256 GB', 'ডেস্কটপ পিসি · ৮/২৫৬ জিবি', 'Tower only · no monitor', 'শুধু সিপিইউ · মনিটর ছাড়া', 'computers', 36500, 33600, 3, 'desktop', '#e8e4dc'],
+  ['monitor-22', 'C204', '22-inch LED monitor', '২২ ইঞ্চি এলইডি মনিটর', 'Full HD · HDMI', 'ফুল এইচডি · এইচডিএমআই', 'computers', 8990, 8100, 5, 'monitor', '#e3e9ee'],
+  ['ssd-256', 'C205', '256 GB SATA SSD', '২৫৬ জিবি সাটা এসএসডি', 'Internal storage', 'ইন্টারনাল স্টোরেজ', 'computers', 2490, 1900, 12, 'chip', '#e9e7db'],
+  ['ram-8', 'C206', '8 GB DDR4 RAM', '৮ জিবি ডিডিআর৪ র‍্যাম', 'Desktop memory', 'ডেস্কটপ মেমোরি', 'computers', 2190, 1700, 10, 'chip', '#e0e9e4'],
+  ['router-dual', 'C207', 'Dual-band Wi-Fi router', 'ডুয়াল-ব্যান্ড ওয়াই-ফাই রাউটার', 'Standard · 2.4 / 5 GHz', 'স্ট্যান্ডার্ড · ২.৪ / ৫ গিগাহার্জ', 'computers', 2490, 1950, 9, 'router', '#e0e8f0', 'grp-0-C207', 'Standard', 'স্ট্যান্ডার্ড'],
+  ['router-tenda', 'C207-T', 'Dual-band Wi-Fi router', 'ডুয়াল-ব্যান্ড ওয়াই-ফাই রাউটার', 'Tenda · AC1200', 'টেন্ডা · এসি১২০০', 'computers', 2990, 2380, 8, 'router', '#e1eae5', 'grp-0-C207', 'Tenda', 'টেন্ডা'],
+  ['router-asus', 'C207-A', 'Dual-band Wi-Fi router', 'ডুয়াল-ব্যান্ড ওয়াই-ফাই রাউটার', 'ASUS · AC1200', 'আসুস · এসি১২০০', 'computers', 4890, 4190, 4, 'router', '#e5e7f0', 'grp-0-C207', 'ASUS', 'আসুস'],
+  ['camera-dahua', 'C208-D', 'CCTV camera · 2 MP', 'সিসিটিভি ক্যামেরা · ২ মেগাপিক্সেল', 'Dahua · bullet camera', 'দাহুয়া · বুলেট ক্যামেরা', 'computers', 2290, 1760, 8, 'cctv', '#e8e8e4', 'grp-0-C208', 'Dahua', 'দাহুয়া'],
+  ['camera-hikvision', 'C208-H', 'CCTV camera · 2 MP', 'সিসিটিভি ক্যামেরা · ২ মেগাপিক্সেল', 'Hikvision · bullet camera', 'হিকভিশন · বুলেট ক্যামেরা', 'computers', 2450, 1890, 8, 'cctv', '#e5e9e9', 'grp-0-C208', 'Hikvision', 'হিকভিশন'],
+  ['psu-deepcool', 'C209-D', 'ATX power supply · 450 W', 'এটিএক্স পাওয়ার সাপ্লাই · ৪৫০ ওয়াট', 'DeepCool · desktop PSU', 'ডিপকুল · ডেস্কটপ পিএসইউ', 'computers', 3490, 2780, 6, 'psu', '#e6e8e7', 'grp-0-C209', 'DeepCool', 'ডিপকুল'],
+  ['psu-antec', 'C209-A', 'ATX power supply · 450 W', 'এটিএক্স পাওয়ার সাপ্লাই · ৪৫০ ওয়াট', 'Antec · desktop PSU', 'অ্যানটেক · ডেস্কটপ পিএসইউ', 'computers', 4190, 3370, 5, 'psu', '#e5e5ea', 'grp-0-C209', 'Antec', 'অ্যানটেক'],
+  ['cctv-dvr-4', 'C210', '4-channel CCTV DVR', '৪ চ্যানেলের সিসিটিভি ডিভিআর', 'Recorder · storage sold separately', 'রেকর্ডার · হার্ডডিস্ক আলাদা', 'computers', 5990, 4790, 4, 'cctv', '#e5e8ec'],
+  ['charger-25w', 'A301', 'USB-C charger · 25 W', 'ইউএসবি-সি চার্জার · ২৫ ওয়াট', 'Standard · adapter only', 'স্ট্যান্ডার্ড · শুধু অ্যাডাপ্টার', 'accessories', 1250, 850, 24, 'charger', '#e5e8e0', 'grp-0-A301', 'Standard', 'স্ট্যান্ডার্ড'],
+  ['charger-anker', 'A301-A', 'USB-C charger · 25 W', 'ইউএসবি-সি চার্জার · ২৫ ওয়াট', 'Anker · adapter only', 'অ্যাঙ্কার · শুধু অ্যাডাপ্টার', 'accessories', 1790, 1350, 9, 'charger', '#e4e9e7', 'grp-0-A301', 'Anker', 'অ্যাঙ্কার'],
+  ['charger-baseus', 'A301-B', 'USB-C charger · 25 W', 'ইউএসবি-সি চার্জার · ২৫ ওয়াট', 'Baseus · adapter only', 'বেসাস · শুধু অ্যাডাপ্টার', 'accessories', 1490, 1080, 12, 'charger', '#e9e8e2', 'grp-0-A301', 'Baseus', 'বেসাস'],
+  ['cable-usbc', 'A302', 'USB-C cable · 1 m', 'ইউএসবি-সি কেবল · ১ মিটার', 'Charging and data', 'চার্জ ও ডাটা', 'accessories', 350, 200, 42, 'cable', '#e8e8e3'],
+  ['cable-lightning', 'A303', 'Lightning cable · 1 m', 'লাইটনিং কেবল · ১ মিটার', 'Charging and data', 'চার্জ ও ডাটা', 'accessories', 550, 340, 20, 'cable', '#e9e7e2'],
+  ['powerbank-10k', 'A304', 'Power bank · 10,000 mAh', 'পাওয়ার ব্যাংক · ১০,০০০ এমএএইচ', 'Dual output', 'দুটি আউটপুট', 'accessories', 1950, 1450, 15, 'battery', '#e6e6ee'],
+  ['screen-guard', 'A305', 'Tempered glass protector', 'টেম্পার্ড গ্লাস প্রটেক্টর', 'Phone screen · each', 'ফোনের স্ক্রিন · প্রতি পিস', 'accessories', 250, 80, 60, 'phone', '#e1ebed'],
+  ['phone-case', 'A306', 'Silicone phone case', 'সিলিকন ফোন কভার', 'Assorted models', 'বিভিন্ন মডেল', 'accessories', 350, 150, 50, 'phone', '#eee3e7'],
+  ['earbuds-tws', 'A307', 'Wireless earbuds · TWS', 'ওয়্যারলেস ইয়ারবাড · টিডব্লিউএস', 'Charging case included', 'চার্জিং কেসসহ', 'accessories', 1750, 1250, 16, 'headphones', '#e5e5ec'],
+  ['earphones-wired', 'A308', 'Wired earphones', 'তারযুক্ত ইয়ারফোন', '3.5 mm connector', '৩.৫ মিমি কানেক্টর', 'accessories', 450, 240, 30, 'headphones', '#e7e7e2'],
+  ['mouse-usb', 'A309', 'USB optical mouse', 'ইউএসবি অপটিক্যাল মাউস', 'Wired · plug and play', 'তারযুক্ত · প্লাগ অ্যান্ড প্লে', 'accessories', 650, 400, 20, 'mouse', '#e3e9e9'],
+  ['keyboard-usb', 'A310', 'USB keyboard', 'ইউএসবি কিবোর্ড', 'Wired · full size', 'তারযুক্ত · পূর্ণ সাইজ', 'accessories', 850, 580, 15, 'keyboard', '#e8e7e0'],
+  ['pendrive-32', 'A311', 'USB flash drive · 32 GB', 'ইউএসবি পেনড্রাইভ · ৩২ জিবি', 'Standard · USB 3.0', 'স্ট্যান্ডার্ড · ইউএসবি ৩.০', 'accessories', 850, 610, 12, 'usbDrive', '#e4e8ec', 'grp-0-A311', 'Standard', 'স্ট্যান্ডার্ড'],
+  ['pendrive-samsung', 'A311-S', 'USB flash drive · 32 GB', 'ইউএসবি পেনড্রাইভ · ৩২ জিবি', 'Samsung · USB 3.1', 'স্যামসাং · ইউএসবি ৩.১', 'accessories', 1190, 900, 10, 'usbDrive', '#e3e8ef', 'grp-0-A311', 'Samsung', 'স্যামসাং'],
+  ['pendrive-sandisk', 'A311-D', 'USB flash drive · 32 GB', 'ইউএসবি পেনড্রাইভ · ৩২ জিবি', 'SanDisk · USB 3.0', 'স্যানডিস্ক · ইউএসবি ৩.০', 'accessories', 1050, 780, 14, 'usbDrive', '#ece6e3', 'grp-0-A311', 'SanDisk', 'স্যানডিস্ক'],
+  ['hdmi-2m', 'A312', 'HDMI cable · 2 m', 'এইচডিএমআই কেবল · ২ মিটার', 'Monitor or TV connection', 'মনিটর বা টিভি সংযোগ', 'accessories', 550, 320, 14, 'cable', '#e6e4e2'],
+  ['adapter-65w', 'A313', 'Laptop adapter · 65 W', 'ল্যাপটপ অ্যাডাপ্টার · ৬৫ ওয়াট', 'Check connector before sale', 'বিক্রির আগে কানেক্টর মিলিয়ে নিন', 'accessories', 1950, 1420, 10, 'charger', '#e4e8e0'],
+  ['headphones-havit', 'A314-H', 'Over-ear headphones', 'ওভার-ইয়ার হেডফোন', 'Havit · wired', 'হ্যাভিট · তারযুক্ত', 'accessories', 1690, 1240, 9, 'headphones', '#e8e7ed', 'grp-0-A314', 'Havit', 'হ্যাভিট'],
+  ['headphones-jbl', 'A314-J', 'Over-ear headphones', 'ওভার-ইয়ার হেডফোন', 'JBL · wired', 'জেবিএল · তারযুক্ত', 'accessories', 3990, 3190, 5, 'headphones', '#e8e4e1', 'grp-0-A314', 'JBL', 'জেবিএল'],
+  ['microsd-64', 'A315', 'microSD card · 64 GB', 'মাইক্রোএসডি কার্ড · ৬৪ জিবি', 'Phone or CCTV storage', 'ফোন বা সিসিটিভির স্টোরেজ', 'accessories', 850, 620, 18, 'chip', '#e4e8e4'],
+  ['usb-hub-4', 'A316', '4-port USB hub', '৪ পোর্টের ইউএসবি হাব', 'USB-A · plug and play', 'ইউএসবি-এ · প্লাগ অ্যান্ড প্লে', 'accessories', 750, 510, 12, 'usbDrive', '#e6e9e6'],
+  ['power-strip-5', 'A317', '5-socket power strip', '৫ সকেটের পাওয়ার স্ট্রিপ', '3-pin plug · switch', '৩-পিন প্লাগ · সুইচ', 'accessories', 1190, 800, 14, 'psu', '#ebe7e2'],
+  ['cctv-adapter', 'A318', '12 V CCTV power adapter', '১২ ভোল্টের সিসিটিভি অ্যাডাপ্টার', 'For compatible cameras', 'উপযুক্ত ক্যামেরার জন্য', 'accessories', 450, 280, 20, 'charger', '#e6e8e5'],
+  ['screen-cleaner', 'A319', 'Screen cleaning kit', 'স্ক্রিন পরিষ্কারের কিট', 'Spray and cloth', 'স্প্রে ও কাপড়', 'accessories', 350, 180, 25, 'cleaner', '#e2eaeb'],
+  ['bnc-connectors', 'A320', 'BNC connector · pair', 'বিএনসি কানেক্টর · এক জোড়া', 'CCTV cable connection', 'সিসিটিভি কেবল সংযোগ', 'accessories', 250, 120, 30, 'cable', '#e9e7e2'],
+  ['service-display', 'S401', 'Phone display replacement · labour', 'ফোনের ডিসপ্লে বদল · মজুরি', 'Screen part billed separately', 'স্ক্রিনের দাম আলাদা', 'services', 800, 250, 0, 'repair', '#e8e8dc'],
+  ['service-battery', 'S402', 'Phone battery replacement · labour', 'ফোনের ব্যাটারি বদল · মজুরি', 'Battery part billed separately', 'ব্যাটারির দাম আলাদা', 'services', 500, 180, 0, 'repair', '#e3e9df'],
+  ['service-software', 'S403', 'Phone software setup', 'ফোন সফটওয়্যার সেটআপ', 'Apps and basic configuration', 'অ্যাপ ও সাধারণ সেটআপ', 'services', 600, 200, 0, 'repair', '#e4e8ed'],
+  ['service-cleaning', 'S404', 'Laptop cleaning', 'ল্যাপটপ পরিষ্কার', 'Fan and internal cleaning', 'ফ্যান ও ভেতর পরিষ্কার', 'services', 1200, 400, 0, 'repair', '#e9e7df'],
+  ['service-os', 'S405', 'OS and driver setup', 'ওএস ও ড্রাইভার সেটআপ', 'License not included', 'লাইসেন্সের দাম আলাদা', 'services', 1500, 350, 0, 'repair', '#e5e8e8'],
+  ['service-transfer', 'S406', 'Data transfer', 'ডাটা স্থানান্তর', 'Phone or computer · basic transfer', 'ফোন বা কম্পিউটার · সাধারণ ডাটা', 'services', 700, 200, 0, 'repair', '#e4e6ee'],
+] satisfies Seed[]).map(seedProduct)
+
+export const customers: Customer[] = []
+// Prior built-in IDs remain available only for saved draft lines. Keeping their
+// original IDs and prices avoids silently changing an unfinished bill.
+type LegacySeed = [id: string, code: string, en: string, bn: string, detail: string, detailBn: string,
+  category: 'staples' | 'fresh' | 'household', unit: ProductUnit, price: number, cost: number, stock: number, art: Product['art'], color: string]
+const legacyProducts: Product[] = ([
+  ['rice', '101', 'Exercise book', 'এক্সারসাইজ খাতা', '80 pages · ruled', '৮০ পৃষ্ঠা · দাগ টানা', 'staples', 'pc', 7200, 6200, 125000, 'book', '#e8e4d8'],
+  ['oil', '102', 'Blue ball pen', 'নীল বলপেন', 'Smooth writing · each', 'মসৃণ লেখা · প্রতি পিস', 'staples', 'pc', 1800, 1200, 48000, 'pen', '#e4eaff'],
+  ['egg', '103', 'HB pencil', 'এইচবি পেন্সিল', 'Wooden · each', 'কাঠের · প্রতি পিস', 'staples', 'pc', 1200, 800, 180000, 'pencil', '#f2dfce'],
+  ['egg-white', '103W', 'Black ball pen', 'কালো বলপেন', 'Fine tip · each', 'সরু নিব · প্রতি পিস', 'staples', 'pc', 1000, 700, 120000, 'pen', '#fffdfa'],
+  ['milk', '104', 'Mobile recharge', 'মোবাইল রিচার্জ', 'All operators · enter amount', 'সব অপারেটর · টাকার পরিমাণ দিন', 'fresh', 'BDT', 100, 98, 24000000, 'recharge', '#e0e8f0'],
+  ['sugar', '105', 'Class notebook', 'ক্লাসের খাতা', '120 pages · ruled', '১২০ পৃষ্ঠা · দাগ টানা', 'staples', 'pc', 13500, 11500, 65000, 'notebook', '#e6e5ee'],
+  ['tea', '106', 'Drawing book', 'ড্রয়িং খাতা', 'A4 · 40 sheets', 'এ ফোর · ৪০ পাতা', 'staples', 'pc', 11000, 9000, 32000, 'book', '#dee9d8'],
+  ['soap', '107', 'Eraser', 'রাবার', 'Soft · each', 'নরম · প্রতি পিস', 'staples', 'pc', 4500, 3000, 56000, 'daily', '#e5ebc9'],
+  ['soap-rose', '108', 'Pencil sharpener', 'পেন্সিল কাটার', 'Metal blade · each', 'ধাতব ব্লেড · প্রতি পিস', 'staples', 'pc', 4500, 3000, 38000, 'daily', '#f0dce1'],
+  ['flour', '109', '30 cm ruler', '৩০ সেমি স্কেল', 'Clear plastic · each', 'স্বচ্ছ প্লাস্টিক · প্রতি পিস', 'staples', 'pc', 6000, 4000, 44000, 'daily', '#eae0cf'],
+  ['lentil', '110', 'Glue stick', 'গ্লু স্টিক', 'Small · each', 'ছোট · প্রতি পিস', 'staples', 'pc', 12000, 9000, 38000, 'daily', '#f0d7c6'],
+  ['biscuit', '111', 'Potato chips', 'আলুর চিপস', 'Small packet · each', 'ছোট প্যাকেট · প্রতি পিস', 'household', 'pc', 3000, 2200, 18000, 'snack', '#eaddba'],
+  ['salt', '112', 'Electricity meter top-up', 'বিদ্যুৎ মিটার টপ-আপ', 'Prepaid meter · enter amount', 'প্রিপেইড মিটার · টাকার পরিমাণ দিন', 'fresh', 'BDT', 100, 99, 40000000, 'recharge', '#d8e8ed'],
+  ['recharge-20', '113', 'Internet recharge', 'ইন্টারনেট রিচার্জ', 'Broadband or data · enter amount', 'ব্রডব্যান্ড বা ডাটা · টাকার পরিমাণ দিন', 'fresh', 'BDT', 100, 97, 50000000, 'recharge', '#e0e8f0'],
+  ['recharge-100', '114', 'TV recharge', 'টিভি রিচার্জ', 'DTH or cable · enter amount', 'ডিটিএইচ বা কেবল · টাকার পরিমাণ দিন', 'fresh', 'BDT', 100, 98, 20000000, 'recharge', '#e0e8f0'],
+  ['khata-small', '115', 'Pocket notebook', 'পকেট নোটবুক', '40 pages · each', '৪০ পৃষ্ঠা · প্রতি পিস', 'staples', 'pc', 2500, 1700, 30000, 'notebook', '#f1e4ca'],
+  ['biscuit-water', '116', 'Bottled water · 500 ml', 'বোতলজাত পানি · ৫০০ মি.লি.', 'Sealed bottle · each', 'সিল করা বোতল · প্রতি পিস', 'household', 'pc', 2000, 1200, 24000, 'daily', '#d8e8ed'],
+] satisfies LegacySeed[]).map(([id, code, en, bn, detail, detailBn, category, unit, price, cost, stock, art, color]) => ({
+  id, code, en, bn, detail, detailBn, category, unit, price, cost, stock, purchased: stock, art, color, archived: true,
+}))
+const legacyCustomers: Customer[] = [
   { id: 'c1', en: 'Nadia Rahman', bn: 'নাদিয়া রহমান', phone: '01700 000101', creditLimit: 500000 },
   { id: 'c2', en: 'Karim Ahmed', bn: 'করিম আহমেদ', phone: '01700 000102', creditLimit: 300000 },
   { id: 'c3', en: 'Shila Begum', bn: 'শীলা বেগম', phone: '01700 000103', creditLimit: 200000 },
 ]
 export const initialState: ShopState = {
-  version: 2,
-  lines: [{ productId: 'rice', quantity: 2000 }, { productId: 'egg', quantity: 6000 }, { productId: 'milk', quantity: 90000 }],
+  version: 3,
+  lines: [],
   discount: 0, customerId: null, receipts: [], customCustomers: [], transactions: [],
 }
 export const allProducts = (custom?: Product[]) => {
@@ -175,40 +246,41 @@ export function damerauLevenshtein(a: string, b: string): number {
 }
 
 const PHONETIC_SYNONYMS: Record<string, string[]> = {
-  // Stationery
-  'খাতা': ['khata', 'kata', 'notebook', 'book', 'exercise'],
-  'বই': ['boi', 'book'],
-  'কলম': ['kolom', 'kalam', 'pen', 'ballpen'],
-  'পেন্সিল': ['pencil', 'pensil', 'pencl'],
-  'কাটার': ['sharpener', 'katar', 'sharpner'],
-  'রাবার': ['eraser', 'rabar', 'raber', 'rubber'],
-  'স্কেল': ['scale', 'skel', 'ruler'],
-  'গ্লু': ['glue', 'glu', 'stick'],
-  'ড্রয়িং': ['drawing', 'draw', 'art'],
-  // Grocery & Daily
-  'আলু': ['alu', 'potato'],
-  'চিপস': ['chips', 'cipsh', 'crisps'],
-  'পানি': ['pani', 'water'],
-  'বোতল': ['botol', 'bottle'],
-  'রিচার্জ': ['recharge', 'ricarj', 'recharj', 'topup'],
-  'বিদ্যুৎ': ['electricity', 'biddut', 'bidyut', 'meter', 'prepaid'],
-  'ইন্টারনেট': ['internet', 'data', 'broadband', 'wifi'],
-  'টিভি': ['tv', 'television', 'dth', 'cable'],
-  'টপ-আপ': ['topup', 'top-up', 'recharge'],
-  'টপআপ': ['topup', 'top-up', 'recharge'],
-  'চাল': ['chal', 'rice'],
-  'তেল': ['tel', 'oil'],
-  'ডিম': ['dim', 'egg'],
-  'চিনি': ['chini', 'sugar'],
-  'চা': ['cha', 'tea'],
-  'সাবান': ['soap', 'shaban', 'sabun'],
-  'আটা': ['flour', 'ata'],
-  'ময়দা': ['flour', 'moyda'],
-  'ডাল': ['lentil', 'dal', 'daal'],
-  'লবণ': ['salt', 'lobon', 'laban'],
-  'দুধ': ['milk', 'dudh'],
-  'বিস্কুট': ['biscuit', 'biskut'],
-  'আম': ['mango', 'aam'],
+  'মোবাইল': ['mobile', 'mobail', 'phone'],
+  'ফোন': ['phone', 'fon'],
+  'বাটন': ['button', 'feature'],
+  'ল্যাপটপ': ['laptop', 'leptop'],
+  'কম্পিউটার': ['computer', 'pc'],
+  'ডেস্কটপ': ['desktop', 'pc'],
+  'মনিটর': ['monitor', 'display'],
+  'চার্জার': ['charger', 'charjar', 'adapter'],
+  'অ্যাডাপ্টার': ['adapter', 'charger'],
+  'কেবল': ['cable', 'kebol'],
+  'ইয়ারফোন': ['earphone', 'headphone'],
+  'ইয়ারবাড': ['earbud', 'earbuds', 'tws'],
+  'হেডফোন': ['headphone', 'headset'],
+  'মাউস': ['mouse', 'maus'],
+  'কিবোর্ড': ['keyboard', 'keybord'],
+  'পেনড্রাইভ': ['pendrive', 'flashdrive', 'usb'],
+  'র‍্যাম': ['ram', 'memory'],
+  'এসএসডি': ['ssd', 'storage'],
+  'স্ক্রিন': ['screen', 'display'],
+  'গ্লাস': ['glass', 'protector'],
+  'কভার': ['cover', 'case'],
+  'সার্ভিস': ['service', 'repair'],
+  'ডিসপ্লে': ['display', 'screen'],
+  'ব্যাটারি': ['battery', 'betari'],
+  'রাউটার': ['router', 'wifi'],
+  'ওয়াই-ফাই': ['wifi', 'router'],
+  'সিসিটিভি': ['cctv', 'camera', 'security'],
+  'ক্যামেরা': ['camera', 'cctv'],
+  'পাওয়ার': ['power', 'psu', 'supply'],
+  'পিএসইউ': ['psu', 'power', 'supply'],
+  'মাইক্রোএসডি': ['microsd', 'memorycard'],
+  'হাব': ['hub', 'usb'],
+  'ডাটা': ['data', 'transfer'],
+  'সেটআপ': ['setup', 'install'],
+  'রিচার্জ': ['recharge', 'topup'],
 }
 
 function extractTokens(text?: string): string[] {
@@ -530,13 +602,41 @@ export const quantityWithUnit = (scaled: number, unit: ProductUnit) => isMoneyUn
   : `${quantityText(scaled)} ${unit}`
 const legacyRechargeValues: Record<string, number> = { milk: 90, salt: 50, 'recharge-20': 20, 'recharge-100': 100 }
 export function migrateShopState(state: ShopState): ShopState {
-  if (state.version === 2) return state
+  if (state.version === 3) return state
+  const oldLines = state.version === 2 ? state.lines : state.lines.map(line => legacyRechargeValues[line.productId]
+    ? { ...line, quantity: line.quantity * legacyRechargeValues[line.productId] }
+    : line)
+  const isSampleDraft = state.receipts.length === 0 && state.discount === 0 && state.customerId === null &&
+    oldLines.length === 3 && oldLines[0].productId === 'rice' && oldLines[0].quantity === 2000 &&
+    oldLines[1].productId === 'egg' && oldLines[1].quantity === 6000 &&
+    oldLines[2].productId === 'milk' && oldLines[2].quantity === 90000
+  const lines = isSampleDraft ? [] : oldLines
+  const customProducts = [...(state.customProducts ?? [])]
+  const knownProducts = new Set([...products, ...customProducts].map(product => product.id))
+  for (const line of lines) {
+    if (knownProducts.has(line.productId)) continue
+    const previous = legacyProducts.find(product => product.id === line.productId)
+    if (previous) {
+      customProducts.push(previous)
+      knownProducts.add(previous.id)
+    }
+  }
+  const customCustomers = [...(state.customCustomers ?? [])]
+  const knownCustomers = new Set(customCustomers.map(customer => customer.id))
+  const referencedCustomers = new Set([
+    state.customerId,
+    ...state.receipts.map(receipt => receipt.customer?.id),
+    ...(state.transactions ?? []).map(transaction => transaction.customerId),
+  ])
+  for (const customer of legacyCustomers) {
+    if (referencedCustomers.has(customer.id) && !knownCustomers.has(customer.id)) customCustomers.push(customer)
+  }
   return {
     ...state,
-    version: 2,
-    lines: state.lines.map(line => legacyRechargeValues[line.productId]
-      ? { ...line, quantity: line.quantity * legacyRechargeValues[line.productId] }
-      : line),
+    version: 3,
+    lines,
+    customProducts,
+    customCustomers,
   }
 }
 export function parseQuantity(value: string, unit: Product['unit']): number | null {
@@ -544,7 +644,7 @@ export function parseQuantity(value: string, unit: Product['unit']): number | nu
   if (!pattern.test(value.trim())) return null
   const scaled = Math.round(Number(value) * 1000)
   const maximum = isMoneyUnit(unit) ? 1000000000 : 10000000
-  if (scaled <= 0 || scaled > maximum || (unit === 'pc' && scaled % 1000 !== 0)) return null
+  if (scaled <= 0 || scaled > maximum || ((unit === 'pc' || unit === 'job') && scaled % 1000 !== 0)) return null
   return scaled
 }
 export function parseMoney(value: string): number | null {
@@ -553,6 +653,7 @@ export function parseMoney(value: string): number | null {
   return Number.isSafeInteger(amount) && amount <= 100000000 ? amount : null
 }
 export function stockFor(product: Product, receipts: Receipt[]) {
+  if (product.trackStock === false) return 0
   return product.stock - receipts.reduce((sum, receipt) => sum + receipt.lines.filter(l => l.productId === product.id).reduce((quantity, line) => {
     // Receipts snapshot their original product. Convert legacy fixed-denomination
     // recharge pieces to their monetary value when reading the new BDT balance.

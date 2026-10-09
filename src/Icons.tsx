@@ -57,6 +57,23 @@ export function ProductArt({ product, className = '' }: { product: Product; clas
     recharge: <><path fill="#3d6fbc" d="M3 2h18v20H3z"/><path fill="#edf2fa" d="M6 5h12v13H6z"/><path fill="#3d6fbc" d="M9 8h6v2H9zm-2 4h3v2H7zm5 0h5v2h-5z"/><path fill="#edc64e" d="M10 17h4v2h-4z"/></>,
     snack: <><path fill="#d98236" d="M5 3h14v3h2v14H3V6h2z"/><path fill="#f4ce73" d="M6 7h12v10H6z"/><path fill="#ae4f3c" d="M8 10h8v2H8zm2 4h4v1h-4z"/></>,
     daily: <><path fill="#4a8995" d="M4 4h16v17H4z"/><path fill="#e9f0e7" d="M7 7h10v10H7z"/><path fill="#4a8995" d="M9 9h6v2H9zm0 4h6v2H9z"/></>,
+    phone: <><path fill="#38465e" d="M6 1h12v22H6z"/><path fill="#dbe9f2" d="M8 4h8v15H8z"/><path fill="#607ea1" d="M9 6h6v8H9z"/><path fill="#9cb6ce" d="M9 15h2v2H9zm4 0h2v2h-2z"/><path fill="#f1f5f7" d="M11 20h2v1h-2z"/></>,
+    featurePhone: <><path fill="#46535e" d="M7 1h10v22H7z"/><path fill="#b3cbb7" d="M9 4h6v7H9z"/><path fill="#dce4d9" d="M9 13h2v2H9zm4 0h2v2h-2zm-4 3h2v2H9zm4 0h2v2h-2zm-4 3h2v2H9zm4 0h2v2h-2z"/></>,
+    laptop: <><path fill="#4c5865" d="M4 3h16v13H4z"/><path fill="#d8e5ed" d="M6 5h12v9H6z"/><path fill="#8caabe" d="M7 6h10v6H7z"/><path fill="#4c5865" d="M2 17h20v3H2z"/><path fill="#82919f" d="M8 18h8v1H8z"/></>,
+    desktop: <><path fill="#475562" d="M3 2h11v20H3z"/><path fill="#c9d7df" d="M5 4h7v12H5z"/><path fill="#8295a3" d="M6 6h5v7H6z"/><path fill="#78a7c5" d="M7 18h2v2H7z"/><path fill="#394650" d="M16 7h5v15h-5z"/></>,
+    monitor: <><path fill="#4c5761" d="M2 3h20v15H2z"/><path fill="#c9e1e8" d="M4 5h16v11H4z"/><path fill="#86abc2" d="M4 13h16v3H4z"/><path fill="#4c5761" d="M11 18h2v3h-2zM8 21h8v2H8z"/></>,
+    chip: <><path fill="#536c69" d="M5 3h14v18H5z"/><path fill="#d8e1cb" d="M7 5h10v14H7z"/><path fill="#719188" d="M9 8h6v7H9z"/><path fill="#536c69" d="M3 6h2v3H3zm0 6h2v3H3zm0 6h2v3H3zM19 6h2v3h-2zm0 6h2v3h-2zm0 6h2v3h-2z"/></>,
+    charger: <><path fill="#4c565e" d="M7 6h10v15H7z"/><path fill="#e2e8e8" d="M9 8h6v10H9z"/><path fill="#4c565e" d="M9 2h2v4H9zm4 0h2v4h-2z"/><path fill="#76a2b6" d="M11 11h3l-2 3h2l-3 3 1-3h-2z"/></>,
+    cable: <><path fill="#59656d" d="M2 5h5v6H2zm15 8h5v6h-5zM6 8h4v2H6zm8 5h4v2h-4z"/><path fill="#83a4ad" d="M9 9h3v2h3v3h-2v-2h-3v-2H9z"/></>,
+    headphones: <><path fill="#465263" d="M4 11V8a8 8 0 0 1 16 0v3h-2V8a6 6 0 0 0-12 0v3z"/><path fill="#87a0b2" d="M3 10h5v10H3zm13 0h5v10h-5z"/><path fill="#465263" d="M5 12h2v6H5zm12 0h2v6h-2z"/></>,
+    battery: <><path fill="#48535f" d="M4 5h16v17H4zM9 2h6v3H9z"/><path fill="#c9decf" d="M6 7h12v13H6z"/><path fill="#71a58c" d="M11 9h3l-2 4h3l-5 6 2-5H9z"/></>,
+    mouse: <><path fill="#56606b" d="M8 2h8l3 5v12l-4 4H9l-4-4V7z"/><path fill="#dce3e5" d="M9 5h6l2 3v10l-3 3h-4l-3-3V8z"/><path fill="#7c9cac" d="M11 5h2v7h-2z"/></>,
+    keyboard: <><path fill="#4d5b63" d="M2 5h20v15H2z"/><path fill="#d6e0de" d="M4 7h16v11H4z"/><path fill="#778f94" d="M5 8h2v2H5zm4 0h2v2H9zm4 0h2v2h-2zm4 0h2v2h-2zM5 12h2v2H5zm4 0h2v2H9zm4 0h2v2h-2zm4 0h2v2h-2zM7 16h10v1H7z"/></>,
+    repair: <><path fill="#596b73" d="m4 4 3-2 4 4-2 3 10 10-2 2L7 11l-3 2-2-4z"/><path fill="#afc7c3" d="m14 4 2-2 2 2-2 2 4 4-2 2-4-4-4 4-2-2z"/><path fill="#e8eee7" d="m4 6 2-2 2 2-2 2z"/></>,
+    router: <><path fill="#596671" d="M4 13h16v8H4zM5 3h2v10H5zm12 0h2v10h-2z"/><path fill="#dbe5e6" d="M6 15h12v4H6z"/><path fill="#6d9c9f" d="M8 16h2v2H8zm4 0h2v2h-2z"/></>,
+    cctv: <><path fill="#53616a" d="M3 7h16v8H3zM8 15h8v3H8zm3 3h2v4h-2z"/><path fill="#dce7e8" d="M5 9h11v4H5z"/><path fill="#6b919e" d="M17 8h4v6h-4z"/><path fill="#364950" d="M18 10h2v2h-2z"/></>,
+    psu: <><path fill="#4f5c66" d="M3 3h18v18H3z"/><path fill="#dce3e4" d="M5 5h14v14H5z"/><circle cx="12" cy="12" r="6" fill="#748994"/><circle cx="12" cy="12" r="4" fill="#dce3e4"/><path fill="#748994" d="M11 7h2v10h-2zM7 11h10v2H7z"/></>,
+    usbDrive: <><path fill="#4c5c68" d="M4 7h13v10H4zM17 9h5v6h-5z"/><path fill="#c9dce0" d="M6 9h9v6H6z"/><path fill="#829da7" d="M8 11h5v2H8z"/><path fill="#4c5c68" d="M19 10h1v2h-1z"/></>,
   }
   return <span className={`product-art ${className}`} style={{ '--art-bg': product.color } as CSSProperties}><svg viewBox="0 0 24 24" shapeRendering="crispEdges" aria-hidden="true">{art[product.art]}</svg></span>
 }
