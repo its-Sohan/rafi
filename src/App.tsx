@@ -9,6 +9,7 @@ import {
   findProductIn,
   initialState,
   isMoneyUnit,
+  isServiceCategory,
   lineTotal,
   lineProfit,
   makeReceipt,
@@ -16,7 +17,7 @@ import {
   parseMoney,
   parseQuantity,
   productCost,
-  products,
+  quantityText,
   quantityWithUnit,
   stockFor,
   subtotal,
@@ -28,9 +29,12 @@ import {
   getProductVariants,
   displayCatalogProducts,
   searchCatalog,
+  serviceArt,
+  serviceCategories,
   scoreProductVariant,
   cleanSearchText,
   type Category,
+  type ServiceCategory,
   type Customer,
   type AccountTransaction,
   type Lang,
@@ -49,7 +53,7 @@ type View = 'sales' | 'inventory' | 'accounts' | 'reports'
 type Dialog = 'payment' | 'customer' | 'discount' | 'shortcuts' | 'settings' | 'clear' | 'receipt' | 'edit' | 'newItem' | 'newCustomer' | 'customerProfile' | 'addTx' | 'itemStats' | null
 const receiptNumber = (n: number) => String(n).padStart(4, '0')
 const dayKey = (date: string | Date) => new Date(date).toLocaleDateString('en-CA', { timeZone: 'Asia/Dhaka' })
-const rateText = (product: Product) => `৳ ${money(product.price)} / ${isMoneyUnit(product.unit) ? '৳1' : product.unit}`
+const rateText = (product: Product, lang: Lang) => `৳ ${money(product.price)} / ${isMoneyUnit(product.unit) ? '৳1' : unitText(product.unit, lang)}`
 
 function FittedQuantity({ value }: { value: string }) {
   const ref = useRef<HTMLSpanElement>(null)
@@ -200,8 +204,8 @@ export default function App() {
   const [newNameEn, setNewNameEn] = useState('')
   const [newNameBn, setNewNameBn] = useState('')
   const [newDetail, setNewDetail] = useState('')
-  const [newCategory, setNewCategory] = useState<Exclude<Category, 'all' | 'recent'>>('accessories')
-  const [newUnit, setNewUnit] = useState<Product['unit']>('pc')
+  const [newCategory, setNewCategory] = useState<Exclude<Category, 'all' | 'recent'>>('printing')
+  const [newUnit, setNewUnit] = useState<Product['unit']>('page')
   const [newPrice, setNewPrice] = useState('')
   const [newCost, setNewCost] = useState('')
   const [newPurchased, setNewPurchased] = useState('')
@@ -227,11 +231,27 @@ export default function App() {
     setNewNameEn('')
     setNewNameBn('')
     setNewDetail('')
-    setNewCategory('accessories')
-    setNewUnit('pc')
+    setNewCategory('printing')
+    setNewUnit('page')
     setNewPrice('')
     setNewCost('')
-    setNewPurchased('10')
+    setNewPurchased('')
+    setHasVariants(false)
+    setVariantRows([])
+    setModalError('')
+    openDialog('newItem')
+  }
+
+  const editService = (product: Product) => {
+    setNewCode(product.code)
+    setNewNameEn(product.en)
+    setNewNameBn(product.bn)
+    setNewDetail(product.detail)
+    setNewCategory(product.category)
+    setNewUnit(product.unit)
+    setNewPrice((product.price / 100).toFixed(2))
+    setNewCost((productCost(product) / 100).toFixed(2))
+    setNewPurchased('')
     setHasVariants(false)
     setVariantRows([])
     setModalError('')
@@ -242,13 +262,14 @@ export default function App() {
     const codeTrim = newCode.trim()
     const enTrim = newNameEn.trim()
     const bnTrim = newNameBn.trim() || enTrim
-    const detailTrim = newDetail.trim() || (newCategory === 'services' ? 'Service labour' : 'Each')
+    const isService = isServiceCategory(newCategory)
+    const detailTrim = newDetail.trim() || (isService ? 'Service fee' : 'Each')
     if (!codeTrim || !enTrim) {
       setModalError(t('fillRequired'))
       return
     }
 
-    if (hasVariants && newCategory !== 'services') {
+    if (hasVariants && !isService) {
       if (variantRows.length === 0) {
         setModalError('Add at least one variant to continue.')
         return
@@ -314,11 +335,10 @@ export default function App() {
       return
     }
     const parsedTotalCost = parseMoney(newCost)
-    if (parsedTotalCost === null || (newCategory !== 'services' && parsedTotalCost <= 0)) {
+    if (parsedTotalCost === null || (!isService && parsedTotalCost <= 0)) {
       setModalError(t('invalidAmount'))
       return
     }
-    const isService = newCategory === 'services'
     const parsedPurchased = isService ? 0 : parseQuantity(newPurchased, newUnit)
     if (parsedPurchased === null || (!isService && parsedPurchased <= 0)) {
       setModalError(t('invalidQuantity'))
@@ -330,9 +350,10 @@ export default function App() {
 
     if (existing) {
       if (isService) {
-        const mergedProd: Product = { ...existing, en: enTrim, bn: bnTrim, detail: detailTrim, detailBn: detailTrim,
-          category: 'services', unit: 'job', price: parsedPrice, cost: parsedCost, stock: 0, purchased: 0,
-          trackStock: false, art: 'repair' }
+        const mergedProd: Product = { ...existing, en: enTrim, bn: bnTrim, detail: detailTrim,
+          detailBn: detailTrim === existing.detail ? existing.detailBn : detailTrim,
+          category: newCategory, unit: newUnit, price: parsedPrice, cost: parsedCost, stock: 0, purchased: 0,
+          trackStock: false, art: newCategory === 'services' ? 'repair' : serviceArt(newCategory as ServiceCategory) }
         setState(s => ({ ...s, customProducts: [...(s.customProducts ?? []).filter(p => p.id !== existing.id), mergedProd] }))
         closeDialog()
         setToast({ text: t('itemCreated') })
@@ -354,7 +375,7 @@ export default function App() {
         en: enTrim,
         bn: bnTrim,
         detail: detailTrim,
-        detailBn: detailTrim,
+        detailBn: detailTrim === existing.detail ? existing.detailBn : detailTrim,
         category: newCategory,
         unit: newUnit,
         price: parsedPrice,
@@ -383,13 +404,13 @@ export default function App() {
       detail: detailTrim,
       detailBn: detailTrim,
       category: newCategory,
-      unit: isService ? 'job' : newUnit,
+      unit: newUnit,
       price: parsedPrice,
       cost: parsedCost,
       stock: parsedPurchased,
       purchased: parsedPurchased,
       trackStock: !isService,
-      art: isService ? 'repair' : newCategory === 'mobiles' ? 'phone' : newCategory === 'computers' ? 'laptop' : 'cable',
+      art: isService ? newCategory === 'services' ? 'repair' : serviceArt(newCategory as ServiceCategory) : newCategory === 'mobiles' ? 'phone' : newCategory === 'computers' ? 'laptop' : 'cable',
       color: '#e4e7d8',
     }
 
@@ -520,9 +541,11 @@ export default function App() {
       }
       if (list.length >= 10) break
     }
-    // If fewer than 10 have been sold, backfill with default display catalog items up to 10
+    // Give a new shop a useful mix of common services until it has sales history.
     if (list.length < 10) {
-      for (const p of displayCatalog) {
+      const starterIds = ['print-pdf-bw', 'photocopy-bw', 'scan-pdf', 'cv-design', 'govt-job-apply', 'university-apply', 'admit-card', 'birth-register', 'nid-correction', 'online-form']
+      const starter = starterIds.flatMap(id => displayCatalog.find(p => p.id === id) ?? [])
+      for (const p of [...starter, ...displayCatalog]) {
         const groupKey = p.groupId ?? p.id
         if (!seen.has(groupKey)) {
           seen.add(groupKey)
@@ -620,7 +643,7 @@ export default function App() {
       const key: Record<string, CopyKey> = { customer: 'customerRequired', overpayment: 'overpayment', empty: 'emptyError', amount: 'invalidAmount' }
       setModalError(t(key[(error as Error).message] ?? 'invalidAmount')); return
     }
-    const next: ShopState = { ...state, version: 3, lines: [], discount: 0, customerId: null, receipts: [...state.receipts, receipt] }
+    const next: ShopState = { ...state, version: 4, lines: [], discount: 0, customerId: null, receipts: [...state.receipts, receipt] }
     paymentLock.current = true; setBusy(true)
     try {
       await saveState(next)
@@ -667,7 +690,7 @@ export default function App() {
       {receipt.lines.map(l => {
         const variantName = lang === 'bn' ? l.product.variantNameBn ?? l.product.variantName : l.product.variantName
         return <div className="receipt-item" key={l.productId}>
-          <span><strong>{l.product[lang]}{variantName && ` · ${variantName}`}</strong><small>{l.product.code} · {quantityWithUnit(l.quantity, l.product.unit)} × {rateText(l.product)}</small></span>
+          <span><strong>{l.product[lang]}{variantName && ` · ${variantName}`}</strong><small>{l.product.code} · {quantityWithUnit(l.quantity, l.product.unit, lang)} × {rateText(l.product, lang)}</small></span>
           <strong>৳ {money(lineTotal(l.product.price, l.quantity))}</strong>
         </div>
       })}
@@ -734,7 +757,7 @@ export default function App() {
                 if (target) chooseProduct(target)
               }
             }}/><kbd>F2</kbd>{query && <button className="icon-button" aria-label={t('clear')} onClick={() => { setQuery(''); goSearch() }}><Icon name="close" size={14}/></button>}</div>
-            <div className="category-tabs" aria-label="Product categories">{(['recent', 'all', 'mobiles', 'computers', 'accessories', 'services'] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}<span>{c === 'recent' ? recentProducts.length : c === 'all' ? displayCatalog.length : displayCatalog.filter(product => product.category === c).length}</span></button>)}</div>
+            <div className="category-tabs" aria-label={t('categoryLabel')}>{(['recent', 'all', ...serviceCategories] as Category[]).map(c => <button key={c} aria-pressed={category === c} className={category === c ? 'active' : ''} onClick={() => { setCategory(c); setQuery(''); goSearch() }}>{t(c)}<span>{c === 'recent' ? recentProducts.length : c === 'all' ? displayCatalog.length : displayCatalog.filter(product => product.category === c).length}</span></button>)}</div>
             <div className="product-table-head"><span>{t('product')}</span><span>{t('price')}</span></div>
             <div className="product-list" aria-label={t('products')}>
               {filtered.map((p, index) => {
@@ -746,7 +769,7 @@ export default function App() {
                   : (lang === 'en' ? p.detail : p.detailBn)
                 const price = hasVariants ? Math.min(...variants.map(v => v.price)) : p.price
                 return <button key={p.id} ref={el => { productRefs.current[index] = el }} className={`product-row ${selected === index ? 'selected' : ''} ${quantityProduct?.id === p.id ? 'entering' : ''}`} onClick={() => chooseProduct(p)} onFocus={() => selectProduct(p, false)} onKeyDown={e => { if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const next = Math.max(0, Math.min(filtered.length - 1, index + (e.key === 'ArrowDown' ? 1 : -1))); productRefs.current[next]?.focus() } }}>
-                  <ProductArt product={p}/><div className="product-info"><strong>{p[lang]}</strong><span><code>{groupCode}</code><i/> {detail}</span></div><div className="product-price"><strong>{money(price)}</strong><span>{hasVariants ? t('fromPrice') : isMoneyUnit(p.unit) ? t('perTaka') : `৳ / ${p.unit}`}</span></div><span className="row-enter">↵</span>
+                  <ProductArt product={p}/><div className="product-info"><strong>{p[lang]}</strong><span><code>{groupCode}</code><i/> {detail}</span></div><div className="product-price"><strong>{money(price)}</strong><span>{hasVariants ? t('fromPrice') : isMoneyUnit(p.unit) ? t('perTaka') : `৳ / ${unitText(p.unit, lang)}`}</span></div><span className="row-enter">↵</span>
                 </button>
               })}
               {!filtered.length && <div className="empty-state"><Icon name="search" size={30}/><h3>{t('noResults')}</h3><p>{t('noResultsHint')}</p></div>}
@@ -800,7 +823,7 @@ export default function App() {
                         aria-describedby={inputError ? 'qty-error' : undefined}
                         aria-invalid={!!inputError}
                       />
-                      <span>{unitText(currentVariant.unit)}</span>
+                      <span>{unitText(currentVariant.unit, lang)}</span>
                     </label>
                     <button className="add-button" type="submit" aria-label={t('addItem')}>
                       <Icon name="arrow" size={21}/>
@@ -823,8 +846,8 @@ export default function App() {
               if (e.key === 'Delete' && state.lines[billSelection]) { e.preventDefault(); removeLine(billSelection) }
             }}>
               {state.lines.map((line, index) => { const p = findItem(line.productId); return <div key={line.productId} data-product-id={line.productId} className={`bill-row ${index === billSelection ? 'bill-selected' : ''}`}>
-                <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{rateText(p)}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
-                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}><FittedQuantity value={quantityWithUnit(line.quantity, p.unit)}/><span>{isMoneyUnit(p.unit) ? t('topUp') : p.unit}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
+                <div className="bill-product"><span className="bill-line-index">{String(index + 1).padStart(2, '0')}</span><div><strong>{p[lang]}</strong><small>{rateText(p, lang)}<span>·</span>{lang === 'en' ? p.detail : p.detailBn}</small></div></div>
+                <button className="bill-qty" aria-label={`${t('editQty')}: ${p[lang]}`} onClick={() => editLine(index)}><FittedQuantity value={isMoneyUnit(p.unit) ? quantityWithUnit(line.quantity, p.unit, lang) : quantityText(line.quantity)}/><span>{isMoneyUnit(p.unit) ? t('topUp') : unitText(p.unit, lang)}</span></button><strong className="bill-amount">{money(lineTotal(p.price, line.quantity))}</strong><button className="remove-line icon-button" aria-label={`${t('remove')}: ${p[lang]}`} onClick={() => removeLine(index)}><Icon name="close" size={14}/></button>
               </div> })}
               {!state.lines.length && <div className="empty-state bill-empty"><div className="empty-pixel"><PixelMark/></div><h3>{t('emptyBill')}</h3><p>{t('emptyBillHint')}</p><button className="text-button" onClick={goSearch}>{t('findItem')} <kbd>F2</kbd></button></div>}
               {state.lines.length > 0 && <div className="bill-end"><span/><Icon name="plus" size={13}/><span/></div>}
@@ -833,9 +856,9 @@ export default function App() {
           </section>
         </div> : <section className="secondary-view" key={view}>
           <div className="metrics-grid">{(view === 'inventory' ? [
-            { label: 'variants', value: String(catalog.length), icon: 'inventory' },
+            { label: 'variants', value: String(catalog.filter(p => !p.archived).length), icon: 'inventory' },
+            { label: 'serviceCount', value: String(catalog.filter(p => !p.archived && p.trackStock === false).length), icon: 'reports' },
             { label: 'stockValue', value: `৳ ${money(catalog.filter(p => p.trackStock !== false && !p.archived).reduce((s, p) => s + lineTotal(p.price, stockFor(p, state.receipts)), 0))}`, icon: 'cash' },
-            { label: 'lowStock', value: String(catalog.filter(p => p.trackStock !== false && !p.archived && stockFor(p, state.receipts) < 10000).length), icon: 'reports' },
           ] : view === 'accounts' ? [
             { label: 'customersLabel', value: String(customerCatalog.length), icon: 'accounts' },
             { label: 'outstanding', value: `৳ ${money(pendingDue)}`, icon: 'cash' },
@@ -878,21 +901,20 @@ export default function App() {
                 </>}
               </div>
             </div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th className="numeric-cell">{t('stock')}</th><th className="numeric-cell">{t('cost')}</th><th className="numeric-cell">{t('price')}</th><th className="numeric-cell">{t('margin')}</th><th className="numeric-cell">{t('purchasedUnits')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{catalog.map(p => {
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('categoryLabel')}</th><th className="numeric-cell">{t('unitOrStock')}</th><th className="numeric-cell">{t('cost')}</th><th className="numeric-cell">{t('feePrice')}</th><th className="numeric-cell">{t('margin')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{catalog.map(p => {
               const cost = productCost(p)
               const margin = unitMargin(p)
               const marginPct = unitMarginPercent(p)
-              const purchased = p.purchased ?? p.stock
               return <tr key={p.id} className={p.archived ? 'product-discontinued' : undefined}>
                 <td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td>
                 <td><code>{p.code}</code></td>
-                <td className="numeric-cell">{p.trackStock === false ? t('notTracked') : quantityWithUnit(stockFor(p, state.receipts), p.unit)}</td>
+                <td>{t(p.category as CopyKey)}</td>
+                <td className="numeric-cell">{p.trackStock === false ? unitText(p.unit, lang) : quantityWithUnit(stockFor(p, state.receipts), p.unit, lang)}</td>
                 <td className="numeric-cell">৳ {money(cost)}</td>
                 <td className="numeric-cell">৳ {money(p.price)}</td>
                 <td className="numeric-cell"><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
-                <td className="numeric-cell">{p.trackStock === false ? '—' : quantityWithUnit(purchased, p.unit)}</td>
                 <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{t(p.archived ? 'statusInactive' : 'statusActive')}</span></td>
-                <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{t(p.archived ? 'actionTurnOn' : 'actionTurnOff')}</button></td>
+                <td><div className="catalog-actions">{p.trackStock === false && <button type="button" className="archive-item-button" onClick={() => editService(p)}>{t('edit')}</button>}<button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{t(p.archived ? 'actionTurnOn' : 'actionTurnOff')}</button></div></td>
               </tr>
             })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th className="numeric-cell">{t('totalDue')}</th><th className="numeric-cell">{t('loan')}</th><th className="numeric-cell">{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
               const b = customerBalance(c, state.receipts, state.transactions)
@@ -971,7 +993,7 @@ export default function App() {
                             </div>
                           </td>
                           <td><code>{p.code}</code></td>
-                          <td className="numeric-cell"><strong>{quantityWithUnit(units, p.unit)}</strong></td>
+                          <td className="numeric-cell"><strong>{quantityWithUnit(units, p.unit, lang)}</strong></td>
                           <td className="numeric-cell">৳ {money(revenue)}</td>
                           <td className="numeric-cell"><span className="profit-text">৳ {money(profit)}</span></td>
                           <td className="numeric-cell">
@@ -1023,7 +1045,7 @@ export default function App() {
 
       {dialog === 'edit' && state.lines[billSelection] && (() => {
         const editProduct = findItem(state.lines[billSelection].productId)
-        return <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{editProduct[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{isMoneyUnit(editProduct.unit) ? t('topUpAmount') : t('quantity')} · {unitText(editProduct.unit)}</label><div className="money-input">{isMoneyUnit(editProduct.unit) && <span>৳</span>}<input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>
+        return <form onSubmit={e => { e.preventDefault(); updateLine() }}><div className="eyebrow modal-eyebrow">{t('editQty')}</div><h3>{editProduct[lang]}<span className="heading-dot">.</span></h3><label className="field-label" htmlFor="edit-qty">{isMoneyUnit(editProduct.unit) ? t('topUpAmount') : t('quantity')} · {unitText(editProduct.unit, lang)}</label><div className="money-input">{isMoneyUnit(editProduct.unit) && <span>৳</span>}<input id="edit-qty" inputMode="decimal" value={qty} onChange={e => { setQty(e.target.value); setModalError('') }}/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('saveQty')}<kbd>↵</kbd></button></div></form>
       })()}
 
       {dialog === 'clear' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('clearTitle')}</h3><p className="modal-description">{t('clearHint')}</p><div className="dialog-actions"><button className="secondary-button" data-initial-focus onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" onClick={() => { setState(s => ({ ...s, lines: [], discount: 0, customerId: null })); closeDialog(); goSearch() }}>{t('confirmClear')}</button></div></>}
@@ -1032,8 +1054,8 @@ export default function App() {
 
       {dialog === 'settings' && <><div className="eyebrow modal-eyebrow">HISAB / SETTINGS</div><h3>{t('settings')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('settingsHint')}</p><div className="setting-row"><span>{t('language')}</span><div className="setting-language"><button onClick={() => setLang('en')} className={lang === 'en' ? 'active' : ''} aria-pressed={lang === 'en'}>English</button><button onClick={() => setLang('bn')} className={lang === 'bn' ? 'active' : ''} aria-pressed={lang === 'bn'}>বাংলা</button></div></div><div className="setting-row"><span>{t('appearance')}</span><div className="setting-language"><button onClick={() => setTheme('light')} className={theme === 'light' ? 'active' : ''} aria-pressed={theme === 'light'}>{t('light')}</button><button onClick={() => setTheme('dark')} className={theme === 'dark' ? 'active' : ''} aria-pressed={theme === 'dark'}>{t('dark')}</button></div></div><div className="setting-row"><span>{t('offlineAccess')}</span><span className={`offline-status ${offlineStatus}`} role="status">{t(offlineStatus === 'ready' ? 'offlineReady' : offlineStatus === 'preparing' ? 'offlinePreparing' : offlineStatus === 'development' ? 'offlineDevelopment' : 'offlineUnavailable')}</span></div><div className="storage-setting"><h4>{t('storage')}</h4><p>{t('storageHint')}</p><button className="secondary-button" onClick={exportBackup}><Icon name="download" size={16}/>{t('export')}</button></div><p className="dialog-note">{t('version')}</p></>}
 
-      {dialog === 'newItem' && <form onSubmit={e => { e.preventDefault(); createProduct() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('inventory')}</div><h3>{t('newItem')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newItemHint')}</p>
-        {newCategory !== 'services' && <div className="variant-toggle-row">
+      {dialog === 'newItem' && <form onSubmit={e => { e.preventDefault(); createProduct() }}><div className="eyebrow modal-eyebrow">{t('workspace')}<span> / </span>{t('inventory')}</div><h3>{catalog.some(p => p.trackStock === false && p.code.toLowerCase() === newCode.trim().toLowerCase()) ? t('editService') : t('newItem')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('newItemHint')}</p>
+        {!isServiceCategory(newCategory) && <div className="variant-toggle-row">
           <label htmlFor="toggle-has-variants">
             <input
               id="toggle-has-variants"
@@ -1066,59 +1088,72 @@ export default function App() {
                 if (!newCost) setNewCost((productCost(matched) / 100).toFixed(2))
                 if (!newPrice) setNewPrice((matched.price / 100).toFixed(2))
               }
-            }} placeholder="e.g. A314" data-initial-focus autoFocus required/>
+            }} placeholder="e.g. PR110" data-initial-focus autoFocus required/>
           </div>
           <div className="form-group">
             <label htmlFor="item-category">{t('categoryLabel')}</label>
             <select id="item-category" className="form-input" value={newCategory} onChange={e => {
               const next = e.target.value as Exclude<Category, 'all' | 'recent'>
               setNewCategory(next)
-              if (next === 'services') { setNewUnit('job'); setHasVariants(false) }
-              else if (newUnit === 'job') setNewUnit('pc')
+              if (isServiceCategory(next)) { setNewUnit(next === 'printing' ? 'page' : 'job'); setHasVariants(false) }
+              else setNewUnit('pc')
             }}>
-              <option value="mobiles">{t('mobiles')}</option>
-              <option value="computers">{t('computers')}</option>
-              <option value="accessories">{t('accessories')}</option>
-              <option value="services">{t('services')}</option>
+              {serviceCategories.map(c => <option key={c} value={c}>{t(c)}</option>)}
+              <optgroup label={t('otherProducts')}>
+                <option value="mobiles">{t('mobiles')}</option>
+                <option value="computers">{t('computers')}</option>
+                <option value="accessories">{t('accessories')}</option>
+                <option value="services">{t('services')}</option>
+                <option value="staples">{t('staples')}</option>
+                <option value="fresh">{t('fresh')}</option>
+                <option value="household">{t('household')}</option>
+              </optgroup>
             </select>
           </div>
           <div className="form-group span-2">
             <label htmlFor="item-name-en">{t('productNameEn')} *</label>
-            <input id="item-name-en" className="form-input" value={newNameEn} onChange={e => { setNewNameEn(e.target.value); setModalError('') }} placeholder="e.g. USB-C charger" required/>
+            <input id="item-name-en" className="form-input" value={newNameEn} onChange={e => { setNewNameEn(e.target.value); setModalError('') }} placeholder="e.g. A3 colour print" required/>
           </div>
           <div className="form-group span-2">
             <label htmlFor="item-name-bn">{t('productNameBn')}</label>
-            <input id="item-name-bn" className="form-input" value={newNameBn} onChange={e => setNewNameBn(e.target.value)} placeholder="e.g. ইউএসবি-সি চার্জার"/>
+            <input id="item-name-bn" className="form-input" value={newNameBn} onChange={e => setNewNameBn(e.target.value)} placeholder="যেমন: এ৩ রঙিন প্রিন্ট"/>
           </div>
           {!hasVariants && (
             <div className="form-group span-2">
               <label htmlFor="item-detail">{t('productDetail')}</label>
-              <input id="item-detail" className="form-input" value={newDetail} onChange={e => setNewDetail(e.target.value)} placeholder={newCategory === 'services' ? 'e.g. Parts billed separately' : 'e.g. 25 W · 1 year warranty'}/>
+              <input id="item-detail" className="form-input" value={newDetail} onChange={e => setNewDetail(e.target.value)} placeholder={isServiceCategory(newCategory) ? 'e.g. Per page · portal fee extra' : 'e.g. Size or warranty'}/>
             </div>
           )}
           <div className="form-group">
             <label htmlFor="item-unit">{t('unitLabel')}</label>
-            <select id="item-unit" className="form-input" value={newUnit} onChange={e => setNewUnit(e.target.value as Product['unit'])} disabled={newCategory === 'services'}>
-              <option value="kg">kg (Kilogram)</option>
-              <option value="pc">pc (Piece)</option>
-              {newCategory === 'services' && <option value="job">job (Service)</option>}
-              <option value="L">L (Litre)</option>
-              <option value="BDT">৳ BDT (Recharge)</option>
+            <select id="item-unit" className="form-input" value={newUnit} onChange={e => setNewUnit(e.target.value as Product['unit'])}>
+              {isServiceCategory(newCategory) ? <>
+                <option value="job">{unitText('job', lang)}</option>
+                <option value="page">{unitText('page', lang)}</option>
+                <option value="sheet">{unitText('sheet', lang)}</option>
+                <option value="set">{unitText('set', lang)}</option>
+                <option value="pc">{unitText('pc', lang)}</option>
+              </> : <>
+                <option value="kg">kg (Kilogram)</option>
+                <option value="pc">pc (Piece)</option>
+                <option value="L">L (Litre)</option>
+                <option value="BDT">৳ BDT (Recharge)</option>
+              </>}
             </select>
           </div>
           {!hasVariants && (
             <>
-              {newCategory !== 'services' && <div className="form-group">
-                <label htmlFor="item-purchased">{isMoneyUnit(newUnit) ? t('openingRechargeBalance') : t('purchasedQty')} ({unitText(newUnit)}) *</label>
+              {!isServiceCategory(newCategory) && <div className="form-group">
+                <label htmlFor="item-purchased">{isMoneyUnit(newUnit) ? t('openingRechargeBalance') : t('purchasedQty')} ({unitText(newUnit, lang)}) *</label>
                 <input id="item-purchased" className="form-input" inputMode="decimal" value={newPurchased} onChange={e => { setNewPurchased(e.target.value); setModalError('') }} placeholder="e.g. 25" required/>
               </div>}
               <div className="form-group">
-                <label htmlFor="item-cost">{t(newCategory === 'services' ? 'serviceCost' : 'purchaseAmount')} (৳) *</label>
-                <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder="e.g. 200.00" required/>
+                <label htmlFor="item-cost">{t(isServiceCategory(newCategory) ? 'serviceCost' : 'purchaseAmount')} (৳) *</label>
+                <input id="item-cost" className="form-input" inputMode="decimal" value={newCost} onChange={e => { setNewCost(e.target.value); setModalError('') }} placeholder={isServiceCategory(newCategory) ? 'e.g. 3.00' : 'e.g. 200.00'} required/>
               </div>
               <div className="form-group">
                 <label htmlFor="item-price">{isMoneyUnit(newUnit) ? t('chargePerTaka') : t('sellingPrice')} (৳) *</label>
-              <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder="e.g. 600.00" required/>
+              <input id="item-price" className="form-input" inputMode="decimal" value={newPrice} onChange={e => { setNewPrice(e.target.value); setModalError('') }} placeholder={isServiceCategory(newCategory) ? 'e.g. 10.00' : 'e.g. 600.00'} required/>
               </div>
             </>
           )}
@@ -1223,7 +1258,7 @@ export default function App() {
           const existingItem = catalog.find(p => p.code.toLowerCase() === newCode.trim().toLowerCase())
           const totalCost = parseMoney(newCost)
           const p = parseMoney(newPrice)
-          const incomingQty = newCategory === 'services' ? null : parseQuantity(newPurchased, newUnit)
+          const incomingQty = isServiceCategory(newCategory) ? null : parseQuantity(newPurchased, newUnit)
 
           if (existingItem && totalCost !== null && p !== null && incomingQty !== null && incomingQty > 0) {
             const incomingUnitCost = Math.round(totalCost * 1000 / incomingQty)
@@ -1245,19 +1280,19 @@ export default function App() {
               <div className="restock-grid">
                 <div>
                   <small>{t('currentStockLabel')}</small>
-                  <strong>{quantityWithUnit(currentStock, existingItem.unit)} @ {rateText({ ...existingItem, price: currentUnitCost })}</strong>
+                  <strong>{quantityWithUnit(currentStock, existingItem.unit, lang)} @ {rateText({ ...existingItem, price: currentUnitCost }, lang)}</strong>
                 </div>
                 <div>
                   <small>{t('incomingStockLabel')}</small>
-                  <strong>+{quantityWithUnit(incomingQty, newUnit)} @ ৳ {money(incomingUnitCost)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
+                  <strong>+{quantityWithUnit(incomingQty, newUnit, lang)} @ ৳ {money(incomingUnitCost)} / {isMoneyUnit(newUnit) ? '৳1' : unitText(newUnit, lang)}</strong>
                 </div>
                 <div>
                   <small>{t('blendedCostLabel')}</small>
-                  <strong>৳ {money(blendedCost)} / {isMoneyUnit(newUnit) ? '৳1' : newUnit}</strong>
+                  <strong>৳ {money(blendedCost)} / {isMoneyUnit(newUnit) ? '৳1' : unitText(newUnit, lang)}</strong>
                 </div>
                 <div>
                   <small>{t('newStockLabel')}</small>
-                  <strong>{quantityWithUnit(totalStock, newUnit)}</strong>
+                  <strong>{quantityWithUnit(totalStock, newUnit, lang)}</strong>
                 </div>
               </div>
               <div className="margin-preview" style={{ marginTop: '10px' }}>
@@ -1473,7 +1508,7 @@ export default function App() {
               <h3>{p[lang]}<span className="heading-dot">.</span></h3>
               <p>
                 <code>{p.code}</code> · {hasVariants ? `${variants.length} ${t('variants')}` : (lang === 'en' ? p.detail : p.detailBn)}
-                {!hasVariants && ` · ${rateText(p)}`}
+                {!hasVariants && ` · ${rateText(p, lang)}`}
               </p>
             </div>
           </div>
@@ -1481,7 +1516,7 @@ export default function App() {
           <div className="customer-stats-grid">
             <div className="customer-stat-card">
               <span>{t('unitsSold')}</span>
-              <strong>{quantityWithUnit(totalSoldUnits, p.unit)}</strong>
+              <strong>{quantityWithUnit(totalSoldUnits, p.unit, lang)}</strong>
             </div>
             <div className="customer-stat-card">
               <span>{t('itemRevenue')}</span>
@@ -1497,11 +1532,11 @@ export default function App() {
             <div className="item-detail-cards-grid">
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('cost')}</span>
-                <strong>৳ {money(cost)} / {isMoneyUnit(p.unit) ? '৳1' : p.unit}</strong>
+                <strong>৳ {money(cost)} / {isMoneyUnit(p.unit) ? '৳1' : unitText(p.unit, lang)}</strong>
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('sellingPrice')}</span>
-                <strong>{rateText(p)}</strong>
+                <strong>{rateText(p, lang)}</strong>
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('unitMargin')}</span>
@@ -1509,7 +1544,7 @@ export default function App() {
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('stock')}</span>
-                <strong>{p.trackStock === false ? t('notTracked') : quantityWithUnit(stockFor(p, state.receipts), p.unit)}</strong>
+                <strong>{p.trackStock === false ? t('notTracked') : quantityWithUnit(stockFor(p, state.receipts), p.unit, lang)}</strong>
               </div>
             </div>
           ) : (
@@ -1546,8 +1581,8 @@ export default function App() {
                         </td>
                         <td>৳ {money(vCost)}</td>
                         <td>৳ {money(v.price)}</td>
-                        <td>{v.trackStock === false ? t('notTracked') : quantityWithUnit(stockFor(v, state.receipts), v.unit)}</td>
-                        <td><strong>{quantityWithUnit(vStat?.units ?? 0, v.unit)}</strong></td>
+                        <td>{v.trackStock === false ? t('notTracked') : quantityWithUnit(stockFor(v, state.receipts), v.unit, lang)}</td>
+                        <td><strong>{quantityWithUnit(vStat?.units ?? 0, v.unit, lang)}</strong></td>
                         <td>৳ {money(vStat?.revenue ?? 0)}</td>
                         <td><span className="profit-text">+৳ {money(vStat?.profit ?? 0)}</span></td>
                       </tr>
@@ -1598,7 +1633,7 @@ export default function App() {
                     <td><small>{new Date(sale.time).toLocaleDateString(lang === 'bn' ? 'bn-BD' : 'en-GB', { day: '2-digit', month: 'short' })} {new Date(sale.time).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })}</small></td>
                     <td>{sale.customerName}</td>
                     {hasVariants && <td><small>{lang === 'bn' ? (sale.product.variantNameBn ?? sale.product.variantName ?? sale.product.detailBn) : (sale.product.variantName ?? sale.product.detail)}</small></td>}
-                    <td><strong>{quantityWithUnit(sale.quantity, sale.product.unit)}</strong></td>
+                    <td><strong>{quantityWithUnit(sale.quantity, sale.product.unit, lang)}</strong></td>
                     <td>৳ {money(sale.total)}</td>
                     <td><span className="profit-text">+ ৳ {money(sale.profit)}</span></td>
                   </tr>

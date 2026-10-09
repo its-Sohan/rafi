@@ -74,6 +74,11 @@ export function ProductArt({ product, className = '' }: { product: Product; clas
     cctv: <><path fill="#53616a" d="M3 7h16v8H3zM8 15h8v3H8zm3 3h2v4h-2z"/><path fill="#dce7e8" d="M5 9h11v4H5z"/><path fill="#6b919e" d="M17 8h4v6h-4z"/><path fill="#364950" d="M18 10h2v2h-2z"/></>,
     psu: <><path fill="#4f5c66" d="M3 3h18v18H3z"/><path fill="#dce3e4" d="M5 5h14v14H5z"/><circle cx="12" cy="12" r="6" fill="#748994"/><circle cx="12" cy="12" r="4" fill="#dce3e4"/><path fill="#748994" d="M11 7h2v10h-2zM7 11h10v2H7z"/></>,
     usbDrive: <><path fill="#4c5c68" d="M4 7h13v10H4zM17 9h5v6h-5z"/><path fill="#c9dce0" d="M6 9h9v6H6z"/><path fill="#829da7" d="M8 11h5v2H8z"/><path fill="#4c5c68" d="M19 10h1v2h-1z"/></>,
+    printer: <><path fill="#526270" d="M6 2h12v6H6zM3 8h18v11H3z"/><path fill="#f7f8f4" d="M8 4h8v5H8zM6 15h12v7H6z"/><path fill="#86a5bb" d="M8 17h8v1H8zm0 2h6v1H8z"/><path fill="#86a5bb" d="M17 11h2v2h-2z"/></>,
+    document: <><path fill="#637287" d="M5 2h11l3 3v17H5z"/><path fill="#f7f8f5" d="M7 4h8v4h3v12H7z"/><path fill="#96a5bd" d="M9 10h7v1H9zm0 3h7v1H9zm0 3h5v1H9z"/></>,
+    form: <><path fill="#65775d" d="M4 2h16v20H4z"/><path fill="#f7f8f1" d="M6 4h12v16H6z"/><path fill="#91ac82" d="M8 7h3v3H8zm0 5h3v3H8z"/><path fill="#597551" d="M12 8h4v1h-4zm0 5h4v1h-4zM9 17h7v1H9z"/></>,
+    idCard: <><path fill="#766c5a" d="M2 5h20v14H2z"/><path fill="#f8f5ec" d="M4 7h16v10H4z"/><path fill="#b7a487" d="M6 9h5v6H6z"/><path fill="#7f7666" d="M13 9h5v1h-5zm0 3h5v1h-5zm0 3h4v1h-4z"/></>,
+    online: <><path fill="#536d68" d="M2 4h20v14H2z"/><path fill="#e7f0ea" d="M4 6h16v10H4z"/><path fill="#83ad9e" d="M7 8h10v2H7zm0 4h5v2H7z"/><path fill="#536d68" d="M9 19h6v2H9zm-3 2h12v1H6z"/></>,
   }
   return <span className={`product-art ${className}`} style={{ '--art-bg': product.color } as CSSProperties}><svg viewBox="0 0 24 24" shapeRendering="crispEdges" aria-hidden="true">{art[product.art]}</svg></span>
 }

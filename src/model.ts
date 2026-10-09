@@ -1,7 +1,8 @@
 export type Lang = 'en' | 'bn'
-export type Category = 'recent' | 'all' | 'mobiles' | 'computers' | 'accessories' | 'services' | 'staples' | 'fresh' | 'household'
-export type ShopCategory = 'mobiles' | 'computers' | 'accessories' | 'services'
-export type ProductUnit = 'kg' | 'pc' | 'L' | 'BDT' | 'job'
+export type ServiceCategory = 'printing' | 'documents' | 'applications' | 'government' | 'digital'
+export type Category = 'recent' | 'all' | ServiceCategory | 'mobiles' | 'computers' | 'accessories' | 'services' | 'staples' | 'fresh' | 'household'
+type FormerShopCategory = 'mobiles' | 'computers' | 'accessories' | 'services'
+export type ProductUnit = 'kg' | 'pc' | 'L' | 'BDT' | 'job' | 'page' | 'sheet' | 'set'
 export type Product = {
   id: string; code: string; en: string; bn: string; detail: string; detailBn: string
   category: Exclude<Category, 'all' | 'recent'>; unit: ProductUnit; price: number; stock: number
@@ -12,7 +13,7 @@ export type Product = {
   variantNameBn?: string // Bengali variant name e.g. 'লাল' / 'সাদা'
   archived?: boolean // Discontinued and hidden from the sales catalog
   trackStock?: boolean // False for labour/services that do not consume a stocked unit
-  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily' | 'phone' | 'featurePhone' | 'laptop' | 'desktop' | 'monitor' | 'chip' | 'charger' | 'cable' | 'headphones' | 'battery' | 'mouse' | 'keyboard' | 'repair' | 'router' | 'cctv' | 'psu' | 'usbDrive'
+  art: 'rice' | 'oil' | 'egg' | 'milk' | 'sugar' | 'tea' | 'soap' | 'flour' | 'lentil' | 'biscuit' | 'salt' | 'cleaner' | 'pencil' | 'book' | 'notebook' | 'pen' | 'recharge' | 'snack' | 'daily' | 'phone' | 'featurePhone' | 'laptop' | 'desktop' | 'monitor' | 'chip' | 'charger' | 'cable' | 'headphones' | 'battery' | 'mouse' | 'keyboard' | 'repair' | 'router' | 'cctv' | 'psu' | 'usbDrive' | 'printer' | 'document' | 'form' | 'idCard' | 'online'
   color: string
 }
 export type Line = { productId: string; quantity: number }
@@ -53,7 +54,7 @@ export type Receipt = {
 }
 
 export type ShopState = {
-  version?: 2 | 3
+  version?: 2 | 3 | 4
   lines: Line[]
   discount: number
   customerId: string | null
@@ -63,7 +64,7 @@ export type ShopState = {
   transactions?: AccountTransaction[]
 }
 type Seed = [id: string, code: string, en: string, bn: string, detail: string, detailBn: string,
-  category: ShopCategory, priceTaka: number, costTaka: number, units: number, art: Product['art'], color: string,
+  category: FormerShopCategory, priceTaka: number, costTaka: number, units: number, art: Product['art'], color: string,
   groupId?: string, variantName?: string, variantNameBn?: string]
 const seedProduct = ([id, code, en, bn, detail, detailBn, category, priceTaka, costTaka, units, art, color, groupId, variantName, variantNameBn]: Seed): Product => ({
   id, code, en, bn, detail, detailBn, category, unit: category === 'services' ? 'job' : 'pc',
@@ -71,8 +72,8 @@ const seedProduct = ([id, code, en, bn, detail, detailBn, category, priceTaka, c
   trackStock: category !== 'services', art, color, groupId, variantName, variantNameBn,
 })
 
-// Illustrative Bangladesh shop catalog. Replace prices and stock with actual shop figures before use.
-export const products: Product[] = ([
+// The previous demo catalog is retained for migration of saved bills and receipts.
+const formerShopProducts: Product[] = ([
   ['mobile-6-128', 'M101', 'Android smartphone · 6/128 GB', 'অ্যান্ড্রয়েড ফোন · ৬/১২৮ জিবি', 'Dual SIM · 4G', 'ডুয়াল সিম · ৪জি', 'mobiles', 16990, 15300, 8, 'phone', '#e5eaf4'],
   ['mobile-8-256', 'M102', 'Android smartphone · 8/256 GB', 'অ্যান্ড্রয়েড ফোন · ৮/২৫৬ জিবি', 'Dual SIM · 5G', 'ডুয়াল সিম · ৫জি', 'mobiles', 24990, 22600, 6, 'phone', '#e7e2f1'],
   ['feature-dual', 'M103', 'Feature phone · dual SIM', 'বাটন ফোন · ডুয়াল সিম', 'Basic calling and SMS', 'কল ও এসএমএস', 'mobiles', 1890, 1450, 18, 'featurePhone', '#e5e9dd'],
@@ -124,6 +125,70 @@ export const products: Product[] = ([
   ['service-transfer', 'S406', 'Data transfer', 'ডাটা স্থানান্তর', 'Phone or computer · basic transfer', 'ফোন বা কম্পিউটার · সাধারণ ডাটা', 'services', 700, 200, 0, 'repair', '#e4e6ee'],
 ] satisfies Seed[]).map(seedProduct)
 
+export const serviceCategories: ServiceCategory[] = ['printing', 'documents', 'applications', 'government', 'digital']
+export const isServiceCategory = (category: Product['category']): boolean => category === 'services' || serviceCategories.includes(category as ServiceCategory)
+export const serviceArt = (category: ServiceCategory): Product['art'] => ({
+  printing: 'printer', documents: 'document', applications: 'form', government: 'idCard', digital: 'online',
+} as const)[category]
+
+type ServiceSeed = [id: string, code: string, en: string, bn: string, detail: string, detailBn: string,
+  category: ServiceCategory, unit: ProductUnit, priceTaka: number, costTaka: number]
+const serviceColors: Record<ServiceCategory, string> = {
+  printing: '#e1eaf0', documents: '#e8e7f0', applications: '#e6eddf', government: '#e9e6dd', digital: '#e2ebe7',
+}
+const seedService = ([id, code, en, bn, detail, detailBn, category, unit, priceTaka, costTaka]: ServiceSeed): Product => ({
+  id, code, en, bn, detail, detailBn, category, unit,
+  price: priceTaka * 100, cost: costTaka * 100, stock: 0, purchased: 0,
+  trackStock: false, art: serviceArt(category), color: serviceColors[category],
+})
+
+// Illustrative counter service fees in BDT. Official application/portal fees are extra.
+export const products: Product[] = ([
+  ['print-pdf-bw', 'PR101', 'PDF print · B&W A4', 'পিডিএফ প্রিন্ট · সাদা-কালো এ৪', 'Per printed page', 'প্রতি প্রিন্ট করা পৃষ্ঠা', 'printing', 'page', 10, 3],
+  ['print-pdf-color', 'PR102', 'PDF print · colour A4', 'পিডিএফ প্রিন্ট · রঙিন এ৪', 'Per printed page', 'প্রতি প্রিন্ট করা পৃষ্ঠা', 'printing', 'page', 25, 10],
+  ['photocopy-bw', 'PR103', 'Photocopy · B&W A4', 'ফটোকপি · সাদা-কালো এ৪', 'Per copied side', 'প্রতি কপি করা পিঠ', 'printing', 'page', 5, 2],
+  ['photocopy-color', 'PR104', 'Photocopy · colour A4', 'ফটোকপি · রঙিন এ৪', 'Per copied side', 'প্রতি কপি করা পিঠ', 'printing', 'page', 25, 10],
+  ['scan-pdf', 'PR105', 'Scan document to PDF', 'ডকুমেন্ট স্ক্যান করে পিডিএফ', 'Per scanned page · digital file', 'প্রতি স্ক্যান করা পৃষ্ঠা · ডিজিটাল ফাইল', 'printing', 'page', 10, 2],
+  ['laminate-a4', 'PR106', 'A4 lamination', 'এ৪ লেমিনেশন', 'Per sheet', 'প্রতি শিট', 'printing', 'sheet', 40, 15],
+  ['bind-document', 'PR107', 'Document binding', 'ডকুমেন্ট বাঁধাই', 'Simple comb binding · per document', 'সাধারণ কম্ব বাঁধাই · প্রতি ডকুমেন্ট', 'printing', 'job', 80, 35],
+  ['passport-photo', 'PR108', 'Passport photo · 4 copies', 'পাসপোর্ট সাইজ ছবি · ৪ কপি', 'One set of four printed photos', 'চারটি প্রিন্ট করা ছবির এক সেট', 'printing', 'set', 100, 25],
+  ['photo-print-4r', 'PR109', 'Photo print · 4R', 'ছবি প্রিন্ট · ৪আর', 'Per print', 'প্রতি প্রিন্ট', 'printing', 'pc', 30, 12],
+
+  ['typing-bn', 'DC201', 'Bangla typing', 'বাংলা টাইপিং', 'From supplied text · per page', 'দেওয়া লেখা থেকে · প্রতি পৃষ্ঠা', 'documents', 'page', 70, 10],
+  ['typing-en', 'DC202', 'English typing', 'ইংরেজি টাইপিং', 'From supplied text · per page', 'দেওয়া লেখা থেকে · প্রতি পৃষ্ঠা', 'documents', 'page', 50, 8],
+  ['cv-design', 'DC203', 'CV / resume design', 'সিভি / জীবনবৃত্তান্ত তৈরি', 'One CV · PDF copy included', 'একটি সিভি · পিডিএফ কপিসহ', 'documents', 'job', 250, 40],
+  ['cv-update', 'DC204', 'CV update and formatting', 'সিভি সংশোধন ও ফরম্যাটিং', 'Existing CV · one revision', 'আগের সিভি · একবার সংশোধন', 'documents', 'job', 100, 15],
+  ['cover-letter', 'DC205', 'Cover letter writing', 'কভার লেটার লেখা', 'One letter · PDF copy', 'একটি চিঠি · পিডিএফ কপি', 'documents', 'job', 120, 20],
+  ['application-letter', 'DC206', 'Application letter typing', 'আবেদনপত্র টাইপিং', 'One letter · supplied details', 'একটি আবেদনপত্র · দেওয়া তথ্য থেকে', 'documents', 'job', 100, 15],
+  ['photo-edit', 'DC207', 'Photo resize and background', 'ছবির সাইজ ও ব্যাকগ্রাউন্ড ঠিক করা', 'One digital photo', 'একটি ডিজিটাল ছবি', 'documents', 'job', 60, 5],
+  ['pdf-edit', 'DC208', 'PDF edit / merge / split', 'পিডিএফ সম্পাদনা / জোড়া / ভাগ', 'One file task · basic edits', 'একটি ফাইলের কাজ · সাধারণ সম্পাদনা', 'documents', 'job', 50, 5],
+
+  ['govt-job-apply', 'AP301', 'Government job application', 'সরকারি চাকরির আবেদন', 'Form entry & submission · portal fee extra', 'ফরম পূরণ ও জমা · পোর্টালের ফি আলাদা', 'applications', 'job', 150, 20],
+  ['private-job-apply', 'AP302', 'Private job application', 'বেসরকারি চাকরির আবেদন', 'One vacancy · required documents supplied', 'একটি পদে · প্রয়োজনীয় কাগজ গ্রাহকের', 'applications', 'job', 100, 10],
+  ['university-apply', 'AP303', 'University admission application', 'বিশ্ববিদ্যালয়ে ভর্তির আবেদন', 'One institution · admission fee extra', 'একটি প্রতিষ্ঠানে · ভর্তি ফি আলাদা', 'applications', 'job', 200, 20],
+  ['college-apply', 'AP304', 'College admission application', 'কলেজে ভর্তির আবেদন', 'One institution · admission fee extra', 'একটি প্রতিষ্ঠানে · ভর্তি ফি আলাদা', 'applications', 'job', 150, 15],
+  ['scholarship-apply', 'AP305', 'Scholarship application', 'বৃত্তির আবেদন', 'One programme · documents supplied', 'একটি কর্মসূচিতে · কাগজপত্র গ্রাহকের', 'applications', 'job', 150, 15],
+  ['exam-register', 'AP306', 'Online exam registration', 'অনলাইনে পরীক্ষার নিবন্ধন', 'One exam · registration fee extra', 'একটি পরীক্ষা · নিবন্ধন ফি আলাদা', 'applications', 'job', 120, 10],
+  ['admit-card', 'AP307', 'Admit card download & print', 'প্রবেশপত্র ডাউনলোড ও প্রিন্ট', 'One admit card · one B&W print', 'একটি প্রবেশপত্র · একটি সাদা-কালো প্রিন্ট', 'applications', 'job', 30, 4],
+  ['result-print', 'AP308', 'Result check & print', 'ফলাফল দেখা ও প্রিন্ট', 'One result · one B&W print', 'একটি ফলাফল · একটি সাদা-কালো প্রিন্ট', 'applications', 'job', 30, 4],
+
+  ['birth-register', 'GV401', 'Birth registration application', 'জন্ম নিবন্ধনের আবেদন', 'Online form help · official fee extra', 'অনলাইন ফরমে সহায়তা · সরকারি ফি আলাদা', 'government', 'job', 200, 20],
+  ['birth-correction', 'GV402', 'Birth record correction request', 'জন্ম নিবন্ধন সংশোধনের আবেদন', 'Online request help · official fee extra', 'অনলাইন আবেদনে সহায়তা · সরকারি ফি আলাদা', 'government', 'job', 250, 25],
+  ['nid-correction', 'GV403', 'NID correction request', 'জাতীয় পরিচয়পত্র সংশোধনের আবেদন', 'Online request help · official fee extra', 'অনলাইন আবেদনে সহায়তা · সরকারি ফি আলাদা', 'government', 'job', 250, 25],
+  ['epassport-apply', 'GV404', 'E-passport application', 'ই-পাসপোর্টের আবেদন', 'Form entry · passport fee extra', 'ফরম পূরণ · পাসপোর্ট ফি আলাদা', 'government', 'job', 300, 30],
+  ['police-clearance', 'GV405', 'Police clearance application', 'পুলিশ ক্লিয়ারেন্সের আবেদন', 'Online form help · official fee extra', 'অনলাইন ফরমে সহায়তা · সরকারি ফি আলাদা', 'government', 'job', 300, 30],
+  ['e-tin', 'GV406', 'E-TIN registration', 'ই-টিআইএন নিবন্ধন', 'Registration help · account access needed', 'নিবন্ধনে সহায়তা · অ্যাকাউন্টে প্রবেশাধিকার দরকার', 'government', 'job', 200, 20],
+  ['land-record', 'GV407', 'Land record / khatian lookup', 'জমির খতিয়ান খোঁজা', 'Search and download · official fee extra', 'খোঁজা ও ডাউনলোড · সরকারি ফি আলাদা', 'government', 'job', 100, 10],
+  ['learner-license', 'GV408', 'Learner driving licence application', 'শিক্ষানবিশ ড্রাইভিং লাইসেন্সের আবেদন', 'BRTA online form help · fee extra', 'বিআরটিএ অনলাইন ফরমে সহায়তা · ফি আলাদা', 'government', 'job', 250, 25],
+
+  ['online-form', 'DG501', 'Online form fill & submit', 'অনলাইন ফরম পূরণ ও জমা', 'One form · customer reviews before submission', 'একটি ফরম · জমার আগে গ্রাহক যাচাই করবেন', 'digital', 'job', 100, 10],
+  ['email-setup', 'DG502', 'Email account setup', 'ইমেইল অ্যাকাউন্ট তৈরি', 'One account · customer keeps password', 'একটি অ্যাকাউন্ট · পাসওয়ার্ড গ্রাহক রাখবেন', 'digital', 'job', 80, 5],
+  ['file-upload', 'DG503', 'File resize and upload', 'ফাইল ছোট করে আপলোড', 'One file · portal limits checked', 'একটি ফাইল · পোর্টালের সীমা দেখে', 'digital', 'job', 50, 5],
+  ['file-convert', 'DG504', 'Word / image to PDF', 'ওয়ার্ড / ছবি থেকে পিডিএফ', 'One file conversion', 'একটি ফাইল রূপান্তর', 'digital', 'job', 30, 2],
+  ['utility-bill-help', 'DG505', 'Utility bill payment assistance', 'ইউটিলিটি বিল পরিশোধে সহায়তা', 'Service charge only · bill amount extra', 'শুধু সার্ভিস চার্জ · বিলের টাকা আলাদা', 'digital', 'job', 30, 2],
+  ['online-fee-help', 'DG506', 'Online fee payment assistance', 'অনলাইনে ফি পরিশোধে সহায়তা', 'Service charge only · payable fee extra', 'শুধু সার্ভিস চার্জ · প্রদেয় ফি আলাদা', 'digital', 'job', 30, 2],
+] satisfies ServiceSeed[]).map(seedService)
+
 export const customers: Customer[] = []
 // Prior built-in IDs remain available only for saved draft lines. Keeping their
 // original IDs and prices avoids silently changing an unfinished bill.
@@ -156,7 +221,7 @@ const legacyCustomers: Customer[] = [
   { id: 'c3', en: 'Shila Begum', bn: 'শীলা বেগম', phone: '01700 000103', creditLimit: 200000 },
 ]
 export const initialState: ShopState = {
-  version: 3,
+  version: 4,
   lines: [],
   discount: 0, customerId: null, receipts: [], customCustomers: [], transactions: [],
 }
@@ -281,6 +346,22 @@ const PHONETIC_SYNONYMS: Record<string, string[]> = {
   'ডাটা': ['data', 'transfer'],
   'সেটআপ': ['setup', 'install'],
   'রিচার্জ': ['recharge', 'topup'],
+  'প্রিন্ট': ['print', 'printing'],
+  'ফটোকপি': ['photocopy', 'photostat', 'xerox', 'copy'],
+  'স্ক্যান': ['scan', 'scanning'],
+  'পিডিএফ': ['pdf'],
+  'সিভি': ['cv', 'resume', 'biodata'],
+  'জীবনবৃত্তান্ত': ['cv', 'resume', 'biodata'],
+  'টাইপিং': ['typing', 'type'],
+  'আবেদন': ['application', 'apply', 'abedon'],
+  'চাকরি': ['job', 'chakri'],
+  'ভর্তি': ['admission', 'vorti'],
+  'বিশ্ববিদ্যালয়ে': ['university', 'varsity'],
+  'পাসপোর্ট': ['passport'],
+  'জন্ম': ['birth'],
+  'পরিচয়পত্র': ['nid', 'idcard'],
+  'ইমেইল': ['email', 'mail'],
+  'বিল': ['bill', 'payment'],
 }
 
 function extractTokens(text?: string): string[] {
@@ -596,14 +677,16 @@ export const subtotal = (lines: Line[], catalog: Product[] = products) => lines.
 export const money = (minor: number) => (minor / 100).toLocaleString('en-BD', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
 export const quantityText = (scaled: number) => (scaled / 1000).toLocaleString('en-US', { maximumFractionDigits: 3 })
 export const isMoneyUnit = (unit: ProductUnit) => unit === 'BDT'
-export const unitText = (unit: ProductUnit) => isMoneyUnit(unit) ? '৳' : unit
-export const quantityWithUnit = (scaled: number, unit: ProductUnit) => isMoneyUnit(unit)
+export const unitText = (unit: ProductUnit, lang: Lang = 'en') => isMoneyUnit(unit) ? '৳' : lang === 'bn'
+  ? ({ kg: 'কেজি', pc: 'পিস', L: 'লি.', BDT: '৳', job: 'কাজ', page: 'পৃষ্ঠা', sheet: 'শিট', set: 'সেট' } as Record<ProductUnit, string>)[unit]
+  : unit
+export const quantityWithUnit = (scaled: number, unit: ProductUnit, lang: Lang = 'en') => isMoneyUnit(unit)
   ? `৳ ${money(Math.round(scaled / 10))}`
-  : `${quantityText(scaled)} ${unit}`
+  : `${quantityText(scaled)} ${unitText(unit, lang)}`
 const legacyRechargeValues: Record<string, number> = { milk: 90, salt: 50, 'recharge-20': 20, 'recharge-100': 100 }
 export function migrateShopState(state: ShopState): ShopState {
-  if (state.version === 3) return state
-  const oldLines = state.version === 2 ? state.lines : state.lines.map(line => legacyRechargeValues[line.productId]
+  if (state.version === 4) return state
+  const oldLines = state.version === 2 || state.version === 3 ? state.lines : state.lines.map(line => legacyRechargeValues[line.productId]
     ? { ...line, quantity: line.quantity * legacyRechargeValues[line.productId] }
     : line)
   const isSampleDraft = state.receipts.length === 0 && state.discount === 0 && state.customerId === null &&
@@ -611,13 +694,22 @@ export function migrateShopState(state: ShopState): ShopState {
     oldLines[1].productId === 'egg' && oldLines[1].quantity === 6000 &&
     oldLines[2].productId === 'milk' && oldLines[2].quantity === 90000
   const lines = isSampleDraft ? [] : oldLines
-  const customProducts = [...(state.customProducts ?? [])]
+  // Keep user-created items. Retire only the former built-in demo items, while
+  // retaining their saved prices for unfinished bills and historical lookup.
+  const formerIds = new Set(formerShopProducts.map(product => product.id))
+  const customProducts = (state.customProducts ?? []).map(product => formerIds.has(product.id)
+    ? { ...product, archived: true }
+    : product)
   const knownProducts = new Set([...products, ...customProducts].map(product => product.id))
-  for (const line of lines) {
-    if (knownProducts.has(line.productId)) continue
-    const previous = legacyProducts.find(product => product.id === line.productId)
+  const referencedIds = new Set([
+    ...lines.map(line => line.productId),
+    ...state.receipts.flatMap(receipt => receipt.lines.map(line => line.productId)),
+  ])
+  for (const id of referencedIds) {
+    if (knownProducts.has(id)) continue
+    const previous = [...formerShopProducts, ...legacyProducts].find(product => product.id === id)
     if (previous) {
-      customProducts.push(previous)
+      customProducts.push({ ...previous, archived: true })
       knownProducts.add(previous.id)
     }
   }
@@ -633,7 +725,7 @@ export function migrateShopState(state: ShopState): ShopState {
   }
   return {
     ...state,
-    version: 3,
+    version: 4,
     lines,
     customProducts,
     customCustomers,
@@ -644,7 +736,7 @@ export function parseQuantity(value: string, unit: Product['unit']): number | nu
   if (!pattern.test(value.trim())) return null
   const scaled = Math.round(Number(value) * 1000)
   const maximum = isMoneyUnit(unit) ? 1000000000 : 10000000
-  if (scaled <= 0 || scaled > maximum || ((unit === 'pc' || unit === 'job') && scaled % 1000 !== 0)) return null
+  if (scaled <= 0 || scaled > maximum || (['pc', 'job', 'page', 'sheet', 'set'].includes(unit) && scaled % 1000 !== 0)) return null
   return scaled
 }
 export function parseMoney(value: string): number | null {

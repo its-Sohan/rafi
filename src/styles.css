@@ -2055,6 +2055,7 @@
 [data-theme="dark"] .product-status.active,.dark .product-status.active{color:#30d158}
 [data-theme="dark"] .product-status.discontinued,.dark .product-status.discontinued{background:#2c2c2e;border-color:#38383a;color:#aeaeb2}
 .archive-item-button{padding:6px 9px;border:1px solid var(--line);border-radius:3px;color:#74786c;font-size:10px;white-space:nowrap}
+.catalog-actions{display:flex;align-items:center;gap:4px}
 .archive-item-button:hover{background:#f4f5f0;color:var(--ink)}
 .product-discontinued .archive-item-button{color:#536b9e}
 [data-theme="dark"] .product-discontinued,.dark .product-discontinued{background:#202022}
