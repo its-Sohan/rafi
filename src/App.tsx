@@ -74,17 +74,17 @@ function FittedQuantity({ value }: { value: string }) {
   return <span className="bill-qty-value" ref={ref}>{value}</span>
 }
 
-function Modal({ children, title, onClose, className = '', canClose = true }: { children: ReactNode; title: string; onClose: () => void; className?: string; canClose?: boolean }) {
+function Modal({ children, title, closeLabel, onClose, className = '', canClose = true }: { children: ReactNode; title: string; closeLabel: string; onClose: () => void; className?: string; canClose?: boolean }) {
   const ref = useRef<HTMLDivElement>(null)
   const titleId = useId()
   useEffect(() => {
     const previous = document.activeElement as HTMLElement | null
     const node = ref.current!
     const focusable = () => [...node.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select, [tabindex="0"]')]
-    const input = node.querySelector<HTMLInputElement>('input')
-    const target = input ?? node.querySelector<HTMLElement>('[data-initial-focus]') ?? focusable()[0]
+    const input = node.querySelector<HTMLInputElement>('input:not([type="checkbox"]):not([type="radio"]):not(:disabled)')
+    const target = node.querySelector<HTMLElement>('[data-initial-focus]') ?? input ?? focusable()[0]
     target?.focus()
-    input?.select()
+    if (target instanceof HTMLInputElement && target.type !== 'checkbox' && target.type !== 'radio') target.select()
     const handle = (event: KeyboardEvent) => {
       if (event.key === 'Escape') { event.preventDefault(); event.stopPropagation(); if (canClose) onClose() }
       if (event.key === 'Tab') {
@@ -100,7 +100,7 @@ function Modal({ children, title, onClose, className = '', canClose = true }: { 
   return <div className="modal-backdrop" onMouseDown={e => { if (e.target === e.currentTarget && canClose) onClose() }}>
     <div ref={ref} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`modal ${className}`}>
       <h2 id={titleId} className="sr-only">{title}</h2>
-      <button className="modal-close icon-button" aria-label="Close" onClick={onClose} disabled={!canClose}><Icon name="close"/></button>
+      <button className="modal-close icon-button" aria-label={closeLabel} onClick={onClose} disabled={!canClose}><Icon name="close"/></button>
       {children}
     </div>
   </div>
@@ -389,6 +389,7 @@ export default function App() {
 
   // Customer provisioning and profile state
   const customerCatalog = allCustomers(state.customCustomers)
+  const matchingCustomers = customerCatalog.filter(c => `${c.en} ${c.bn} ${c.phone}`.toLowerCase().includes(customerQuery.toLowerCase()))
   const [newCustEn, setNewCustEn] = useState('')
   const [newCustBn, setNewCustBn] = useState('')
   const [newCustPhone, setNewCustPhone] = useState('')
@@ -794,7 +795,7 @@ export default function App() {
             </div>
             <div className="bill-summary"><div className="summary-row"><span>{t('subtotal')}<small>{state.lines.length} {t('items')}</small></span><span>৳ {money(billSubtotal)}</span></div><div className="summary-row"><button className="discount-button" onClick={() => { setDiscountInput(state.discount ? (state.discount / 100).toFixed(2) : ''); openDialog('discount') }} disabled={!state.lines.length}><Icon name="plus" size={13}/>{state.discount ? t('discount') : t('addDiscount')}</button><span>{state.discount ? `− ৳ ${money(state.discount)}` : '—'}</span></div><div className="total-row"><div><span>{t('total')}</span><small>BDT</small></div><strong><span>৳</span>{money(billTotal)}</strong></div><button className="payment-button" onClick={openPayment} disabled={!state.lines.length || !ready}><span>{t('payment')}</span><span className="payment-button-right"><kbd>+</kbd><Icon name="arrow" size={23}/></span></button><div className="payment-caption"><span>{t('paymentHint')} <kbd>+</kbd></span><span className={`save-status ${storageStatus}`}><i/>{t(storageStatus === 'saved' ? 'deviceOnly' : storageStatus === 'saving' ? 'saving' : 'storageError')}</span></div></div>
           </section>
-        </div> : <section className="secondary-view">
+        </div> : <section className="secondary-view" key={view}>
           <div className="metrics-grid">{(view === 'inventory' ? [
             { label: 'variants', value: String(catalog.length), icon: 'inventory' },
             { label: 'stockValue', value: `৳ ${money(catalog.reduce((s, p) => s + lineTotal(p.price, stockFor(p, state.receipts)), 0))}`, icon: 'cash' },
@@ -812,9 +813,9 @@ export default function App() {
           <div className="panel data-panel">
             <div className="panel-heading">
               <div className="section-title">
-                <h2>{t(view === 'inventory' ? 'products' : view === 'accounts' ? 'customerAccounts' : 'recentSales')}</h2>
+                <h2>{t(view === 'inventory' ? 'products' : view === 'accounts' ? 'customerAccounts' : reportsSubView === 'products' ? 'reportsTabsProducts' : 'recentSales')}</h2>
                 {view === 'accounts' && <span className="count-badge">{customerCatalog.length}</span>}
-                {view === 'reports' && <span className="count-badge">{windowReceipts.length}</span>}
+                {view === 'reports' && <span className="count-badge">{reportsSubView === 'products' ? displayCatalog.length : windowReceipts.length}</span>}
               </div>
               <div className="inventory-header-actions">
                 {view === 'inventory' && <button className="provision-trigger" onClick={openProvisionDialog}><Icon name="plus" size={15}/><span>{t('provisionItem')}</span></button>}
@@ -829,11 +830,11 @@ export default function App() {
                       <option value="month">{t('windowMonth')}</option>
                     </select>
                   </div>
-                  <div className="reports-tab-toggle" role="tablist" aria-label="Report views">
-                    <button type="button" role="tab" aria-selected={reportsSubView === 'sales'} className={reportsSubView === 'sales' ? 'active' : ''} onClick={() => setReportsSubView('sales')}>
+                  <div className="reports-tab-toggle" role="group" aria-label={t('reports')}>
+                    <button type="button" aria-pressed={reportsSubView === 'sales'} className={reportsSubView === 'sales' ? 'active' : ''} onClick={() => setReportsSubView('sales')}>
                       <Icon name="reports" size={13}/><span>{t('reportsTabsSales')}</span>
                     </button>
-                    <button type="button" role="tab" aria-selected={reportsSubView === 'products'} className={reportsSubView === 'products' ? 'active' : ''} onClick={() => setReportsSubView('products')}>
+                    <button type="button" aria-pressed={reportsSubView === 'products'} className={reportsSubView === 'products' ? 'active' : ''} onClick={() => setReportsSubView('products')}>
                       <Icon name="inventory" size={13}/><span>{t('reportsTabsProducts')}</span>
                     </button>
                   </div>
@@ -841,7 +842,7 @@ export default function App() {
                 </>}
               </div>
             </div>
-            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th>{t('stock')}</th><th>{t('cost')}</th><th>{t('price')}</th><th>{t('margin')}</th><th>{t('purchasedUnits')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{catalog.map(p => {
+            {view === 'inventory' ? <div className="data-table-wrap"><table className="data-table inventory-table"><thead><tr><th>{t('product')}</th><th>{t('code')}</th><th className="numeric-cell">{t('stock')}</th><th className="numeric-cell">{t('cost')}</th><th className="numeric-cell">{t('price')}</th><th className="numeric-cell">{t('margin')}</th><th className="numeric-cell">{t('purchasedUnits')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{catalog.map(p => {
               const cost = productCost(p)
               const margin = unitMargin(p)
               const marginPct = unitMarginPercent(p)
@@ -849,22 +850,22 @@ export default function App() {
               return <tr key={p.id} className={p.archived ? 'product-discontinued' : undefined}>
                 <td><div className="inventory-product"><ProductArt product={p}/><span><strong>{p[lang]}</strong><small>{lang === 'en' ? p.detail : p.detailBn}</small></span></div></td>
                 <td><code>{p.code}</code></td>
-                <td>{quantityWithUnit(stockFor(p, state.receipts), p.unit)}</td>
-                <td>৳ {money(cost)}</td>
-                <td>৳ {money(p.price)}</td>
-                <td><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
-                <td>{quantityWithUnit(purchased, p.unit)}</td>
+                <td className="numeric-cell">{quantityWithUnit(stockFor(p, state.receipts), p.unit)}</td>
+                <td className="numeric-cell">৳ {money(cost)}</td>
+                <td className="numeric-cell">৳ {money(p.price)}</td>
+                <td className="numeric-cell"><span className="margin-badge">৳ {money(margin)} ({marginPct.toFixed(0)}%)</span></td>
+                <td className="numeric-cell">{quantityWithUnit(purchased, p.unit)}</td>
                 <td><span className={`product-status ${p.archived ? 'discontinued' : 'active'}`}>{t(p.archived ? 'statusInactive' : 'statusActive')}</span></td>
                 <td><button type="button" className="archive-item-button" onClick={() => setProductArchived(p, !p.archived)}>{t(p.archived ? 'actionTurnOn' : 'actionTurnOff')}</button></td>
               </tr>
-            })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th>{t('totalDue')}</th><th>{t('loan')}</th><th>{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
+            })}</tbody></table></div> : view === 'accounts' ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('customer')}</th><th>{t('phone')}</th><th className="numeric-cell">{t('totalDue')}</th><th className="numeric-cell">{t('loan')}</th><th className="numeric-cell">{t('availableCredit')}</th><th/></tr></thead><tbody>{customerCatalog.map(c => {
               const b = customerBalance(c, state.receipts, state.transactions)
               return <tr key={c.id}>
                 <td><div className="account-name"><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><strong>{c[lang]}</strong></div></td>
                 <td><code>{c.phone}</code></td>
-                <td>{b.totalDue > 0 ? <strong>৳ {money(b.totalDue)}</strong> : <span className="settled-badge">{t('settled')}</span>}</td>
-                <td>{b.loan > 0 ? <span className="tx-badge loan">৳ {money(b.loan)}</span> : '—'}</td>
-                <td><span className="tx-badge payment">৳ {money(b.availableCredit)}</span></td>
+                <td className="numeric-cell">{b.totalDue > 0 ? <strong>৳ {money(b.totalDue)}</strong> : <span className="settled-badge">{t('settled')}</span>}</td>
+                <td className="numeric-cell">{b.loan > 0 ? <span className="tx-badge loan">৳ {money(b.loan)}</span> : '—'}</td>
+                <td className="numeric-cell"><span className="tx-badge payment">৳ {money(b.availableCredit)}</span></td>
                 <td><button className="icon-button" aria-label={`${t('viewProfile')}: ${c[lang]}`} onClick={() => openCustomerProfile(c)}><Icon name="chevron" size={16}/></button></td>
               </tr>
             })}</tbody></table></div> : reportsSubView === 'products' ? (() => {
@@ -899,17 +900,17 @@ export default function App() {
                 }
               }).sort((a, b) => b.revenue - a.revenue)
 
-              return <div className="data-table-wrap">
+              return <div className="data-table-wrap" key="product-reports">
                 <table className="data-table">
                   <thead>
                     <tr>
                       <th>{t('product')}</th>
                       <th>{t('code')}</th>
-                      <th>{t('unitsSold')}</th>
-                      <th>{t('itemRevenue')}</th>
-                      <th>{t('itemProfit')}</th>
-                      <th>{t('unitProfitLabel')}</th>
-                      <th>{t('salesOccurrences')}</th>
+                      <th className="numeric-cell">{t('unitsSold')}</th>
+                      <th className="numeric-cell">{t('itemRevenue')}</th>
+                      <th className="numeric-cell">{t('itemProfit')}</th>
+                      <th className="numeric-cell">{t('unitProfitLabel')}</th>
+                      <th className="numeric-cell">{t('salesOccurrences')}</th>
                       <th/>
                     </tr>
                   </thead>
@@ -934,15 +935,15 @@ export default function App() {
                             </div>
                           </td>
                           <td><code>{p.code}</code></td>
-                          <td><strong>{quantityWithUnit(units, p.unit)}</strong></td>
-                          <td>৳ {money(revenue)}</td>
-                          <td><span className="profit-text">৳ {money(profit)}</span></td>
-                          <td>
+                          <td className="numeric-cell"><strong>{quantityWithUnit(units, p.unit)}</strong></td>
+                          <td className="numeric-cell">৳ {money(revenue)}</td>
+                          <td className="numeric-cell"><span className="profit-text">৳ {money(profit)}</span></td>
+                          <td className="numeric-cell">
                             <span className="margin-badge">
                               {hasVariants ? `~${mPct.toFixed(0)}%` : `৳ ${money(m)} (${mPct.toFixed(0)}%)`}
                             </span>
                           </td>
-                          <td>{orderCount}</td>
+                          <td className="numeric-cell">{orderCount}</td>
                           <td>
                             <button className="icon-button" aria-label={`${t('viewItemStats')}: ${p[lang]}`} onClick={e => { e.stopPropagation(); setActiveReportProduct(p); openDialog('itemStats') }}>
                               <Icon name="chevron" size={16}/>
@@ -954,7 +955,7 @@ export default function App() {
                   </tbody>
                 </table>
               </div>
-            })() : windowReceipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th>{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...windowReceipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td>৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
+            })() : windowReceipts.length ? <div className="data-table-wrap"><table className="data-table"><thead><tr><th>{t('transaction')}</th><th>{t('customer')}</th><th>{t('time')}</th><th className="numeric-cell">{t('amount')}</th><th>{t('status')}</th><th/></tr></thead><tbody>{[...windowReceipts].reverse().map(r => <tr key={r.id}><td><code>#{receiptNumber(r.number)}</code></td><td>{r.customer ? r.customer[lang] : t('walkIn')}</td><td>{new Date(r.createdAt).toLocaleString('en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'short', timeStyle: 'short' })}</td><td className="numeric-cell">৳ {money(r.total)}</td><td><span className="local-badge">{t('saved')}</span></td><td><button className="icon-button" aria-label={`${t('viewReceipt')} #${receiptNumber(r.number)}`} onClick={() => { setActiveReceipt(r); setJustCompleted(false); openDialog('receipt') }}><Icon name="chevron" size={16}/></button></td></tr>)}</tbody></table></div> : <div className="empty-state reports-empty"><Icon name="reports" size={34}/><h3>{t('noSales')}</h3><p>{t('noSalesHint')}</p><button className="text-button" onClick={() => setView('sales')}>{t('sales')}<Icon name="arrow" size={16}/></button></div>}
             <div className="data-footnote">{t(view === 'inventory' ? 'catalogNote' : view === 'accounts' ? 'accountNote' : 'reportNote')}</div>
           </div>{view === 'accounts' && <p className="phase-note">{t('cashbookNote')}</p>}
         </section>}
@@ -977,10 +978,10 @@ export default function App() {
 
     {toast && <div className="toast" role="status"><Icon name="check" size={16}/><span>{toast.text}</span>{toast.undo && <button onClick={() => { toast.undo?.(); setToast(null) }}>{t('undo')}</button>}<button className="icon-button" aria-label={t('close')} onClick={() => setToast(null)}><Icon name="close" size={13}/></button></div>}
 
-    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : dialog === 'newCustomer' ? 'newCustomer' : dialog === 'customerProfile' ? 'customerProfile' : dialog === 'addTx' ? 'addTransaction' : dialog === 'itemStats' ? 'itemOverview' : 'receipt')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
+    {dialog && <Modal title={t(dialog === 'payment' ? 'payment' : dialog === 'customer' ? 'chooseCustomer' : dialog === 'discount' ? 'discountTitle' : dialog === 'shortcuts' ? 'shortcuts' : dialog === 'settings' ? 'settings' : dialog === 'clear' ? 'clearTitle' : dialog === 'edit' ? 'editQty' : dialog === 'newItem' ? 'newItem' : dialog === 'newCustomer' ? 'newCustomer' : dialog === 'customerProfile' ? 'customerProfile' : dialog === 'addTx' ? 'addTransaction' : dialog === 'itemStats' ? 'itemOverview' : 'receipt')} closeLabel={t('close')} onClose={closeDialog} canClose={!busy} className={`dialog-${dialog}`}>
       {dialog === 'payment' && <form onSubmit={e => { e.preventDefault(); completeSale() }}><div className="eyebrow modal-eyebrow">{t('counter')}<span> / </span>#{receiptNumber(state.receipts.length + 1)}</div><h3>{t('payment')}<span className="heading-dot">.</span></h3><div className="payment-total"><span>{t('total')}</span><strong><small>৳</small>{money(billTotal)}</strong><span>{customer ? customer[lang] : t('walkIn')} · {state.lines.length} {t('items')}</span></div><div className="payment-methods" aria-label={t('method')}>{(['cash', 'mobile', 'bank'] as const).map(method => <button key={method} type="button" className={method === paymentMethod ? 'active' : ''} onClick={() => { setPaymentMethod(method); setModalError('') }} aria-pressed={method === paymentMethod}><Icon name={method}/>{t(method)}</button>)}</div><div className="payment-input-label"><label htmlFor="received">{t('received')}</label><button type="button" className="text-button" onClick={() => setReceived((billTotal / 100).toFixed(2))}>{t('exact')}</button></div><div className="money-input"><span>৳</span><input id="received" inputMode="decimal" value={received} onChange={e => { setReceived(e.target.value); setModalError('') }} aria-invalid={!!modalError} aria-describedby={modalError ? 'payment-error' : undefined}/><small>BDT</small></div><div className={`change-row ${paidAmount < billTotal ? 'due' : ''}`}><span>{t(paidAmount < billTotal ? 'due' : 'change')}</span><strong>৳ {money(Math.abs(paidAmount - billTotal))}</strong></div>{modalError && <p className="field-error" id="payment-error" role="alert">{modalError}</p>}<button className="primary-button" type="submit" disabled={busy}><span>{t(busy ? 'completing' : 'complete')}</span><kbd>↵</kbd></button><p className="dialog-note">{t('paymentNote')}</p></form>}
 
-      {dialog === 'customer' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('chooseCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('customerHint')}</p><div className="search-box"><Icon name="search" size={19}/><input aria-label={t('customerSearch')} placeholder={t('customerSearch')} value={customerQuery} onChange={e => setCustomerQuery(e.target.value)}/></div><div className="customer-options"><button onClick={() => { setState(s => ({ ...s, customerId: null })); closeDialog() }}><span className="initial-avatar"><Icon name="accounts"/></span><span><strong>{t('walkIn')}</strong><small>—</small></span>{!customer && <Icon name="check"/>}</button>{customerCatalog.filter(c => `${c.en} ${c.bn} ${c.phone}`.toLowerCase().includes(customerQuery.toLowerCase())).map(c => <button key={c.id} onClick={() => { setState(s => ({ ...s, customerId: c.id })); closeDialog() }}><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><span><strong>{c[lang]}</strong><small>{c.phone}</small></span>{customer?.id === c.id && <Icon name="check"/>}</button>)}</div></>}
+      {dialog === 'customer' && <><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('chooseCustomer')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('customerHint')}</p><div className="search-box"><Icon name="search" size={19}/><input aria-label={t('customerSearch')} placeholder={t('customerSearch')} value={customerQuery} onChange={e => setCustomerQuery(e.target.value)}/></div><div className="customer-options"><button onClick={() => { setState(s => ({ ...s, customerId: null })); closeDialog() }}><span className="initial-avatar"><Icon name="accounts"/></span><span><strong>{t('walkIn')}</strong><small>—</small></span>{!customer && <Icon name="check"/>}</button>{matchingCustomers.map(c => <button key={c.id} onClick={() => { setState(s => ({ ...s, customerId: c.id })); closeDialog() }}><span className="initial-avatar">{c.en.split(' ').map(s => s[0]).join('')}</span><span><strong>{c[lang]}</strong><small>{c.phone}</small></span>{customer?.id === c.id && <Icon name="check"/>}</button>)}{!matchingCustomers.length && <div className="empty-state customer-search-empty"><p>{t('noCustomerFound')}</p></div>}</div></>}
 
       {dialog === 'discount' && <form onSubmit={e => { e.preventDefault(); const value = parseMoney(discountInput); if (value === null) { setModalError(t('invalidAmount')); return } if (value >= billSubtotal) { setModalError(t('discountInvalid')); return } setState(s => ({ ...s, discount: value })); closeDialog() }}><div className="eyebrow modal-eyebrow">{t('currentBill')}</div><h3>{t('discountTitle')}<span className="heading-dot">.</span></h3><p className="modal-description">{t('discountHint')}</p><label className="field-label" htmlFor="discount">{t('discount')} · BDT</label><div className="money-input"><span>৳</span><input id="discount" value={discountInput} onChange={e => { setDiscountInput(e.target.value); setModalError('') }} inputMode="decimal" placeholder="0.00"/></div>{modalError && <p className="field-error" role="alert">{modalError}</p>}<div className="dialog-actions"><button className="secondary-button" type="button" onClick={closeDialog}>{t('cancel')}</button><button className="primary-button" type="submit">{t('apply')}<kbd>↵</kbd></button></div></form>}
 
@@ -1029,7 +1030,7 @@ export default function App() {
                 if (!newCost) setNewCost((productCost(matched) / 100).toFixed(2))
                 if (!newPrice) setNewPrice((matched.price / 100).toFixed(2))
               }
-            }} placeholder="e.g. 113" autoFocus required/>
+            }} placeholder="e.g. 113" data-initial-focus autoFocus required/>
           </div>
           <div className="form-group">
             <label htmlFor="item-category">{t('categoryLabel')}</label>
@@ -1464,7 +1465,7 @@ export default function App() {
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('unitMargin')}</span>
-                <strong style={{ color: '#2e6b36' }}>৳ {money(margin)} ({marginPct.toFixed(0)}%)</strong>
+                <strong className="profit-text">৳ {money(margin)} ({marginPct.toFixed(0)}%)</strong>
               </div>
               <div className="item-detail-subcard">
                 <span className="eyebrow">{t('stock')}</span>
