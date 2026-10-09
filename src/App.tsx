@@ -652,18 +652,35 @@ export default function App() {
   })
 
   const renderReceipt = (receipt: Receipt) => <div className="receipt-paper" id="print-receipt">
-    <div className="receipt-brand"><PixelMark small/><strong>hisab<span>.</span></strong></div>
+    <div className="receipt-header">
+      <div className="receipt-brand"><PixelMark small/><strong>hisab<span>.</span></strong></div>
+      <span className="receipt-label">{t('receipt')}</span>
+    </div>
     <p className="receipt-shop">{t('shop')}</p>
-    <div className="receipt-meta"><span>#{receiptNumber(receipt.number)}</span><span>{new Date(receipt.createdAt).toLocaleString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'medium', timeStyle: 'short' })}</span></div>
-    <p className="receipt-customer">{receipt.customer ? receipt.customer[lang] : t('walkIn')}</p>
-    <div className="receipt-items">{receipt.lines.map(l => <div key={l.productId}><span>{l.product[lang]}<small>{quantityWithUnit(l.quantity, l.product.unit)} × {rateText(l.product)}</small></span><strong>{money(lineTotal(l.product.price, l.quantity))}</strong></div>)}</div>
-    <div className="receipt-total"><span>{t('subtotal')}</span><span>৳ {money(receipt.subtotal)}</span></div>
-    {receipt.discount > 0 && <div className="receipt-total"><span>{t('discount')}</span><span>− {money(receipt.discount)}</span></div>}
-    <div className="receipt-total grand"><strong>{t('total')}</strong><strong>৳ {money(receipt.total)}</strong></div>
-    <div className="receipt-total"><span>{t('paid')} · {t(receipt.method)}</span><span>{money(receipt.paid)}</span></div>
-    {receipt.change > 0 && <div className="receipt-total"><span>{t('change')}</span><span>{money(receipt.change)}</span></div>}
-    {receipt.due > 0 && <div className="receipt-total"><span>{t('due')}</span><span>{money(receipt.due)}</span></div>}
-    <p className="receipt-thanks">{t('thanks')}</p><p className="receipt-local">{t('localReceipt')}</p>
+    <div className="receipt-meta">
+      <span><small>{t('receiptNo')}</small><strong>#{receiptNumber(receipt.number)}</strong></span>
+      <span><small>{t('time')}</small><strong>{new Date(receipt.createdAt).toLocaleString(lang === 'bn' ? 'bn-BD' : 'en-GB', { timeZone: 'Asia/Dhaka', dateStyle: 'medium', timeStyle: 'short' })}</strong></span>
+    </div>
+    <div className="receipt-customer"><span>{t('customer')}</span><strong>{receipt.customer ? receipt.customer[lang] : t('walkIn')}</strong></div>
+    <div className="receipt-items">
+      <div className="receipt-items-head"><span>{t('product')}</span><span>{t('amount')}</span></div>
+      {receipt.lines.map(l => {
+        const variantName = lang === 'bn' ? l.product.variantNameBn ?? l.product.variantName : l.product.variantName
+        return <div className="receipt-item" key={l.productId}>
+          <span><strong>{l.product[lang]}{variantName && ` · ${variantName}`}</strong><small>{l.product.code} · {quantityWithUnit(l.quantity, l.product.unit)} × {rateText(l.product)}</small></span>
+          <strong>৳ {money(lineTotal(l.product.price, l.quantity))}</strong>
+        </div>
+      })}
+    </div>
+    <div className="receipt-totals">
+      <div className="receipt-total"><span>{t('subtotal')}</span><span>৳ {money(receipt.subtotal)}</span></div>
+      {receipt.discount > 0 && <div className="receipt-total"><span>{t('discount')}</span><span>− ৳ {money(receipt.discount)}</span></div>}
+      <div className="receipt-total grand"><strong>{t('total')}</strong><strong>৳ {money(receipt.total)}</strong></div>
+      <div className="receipt-total"><span>{t('paid')} · {t(receipt.method)}</span><span>৳ {money(receipt.paid)}</span></div>
+      {receipt.change > 0 && <div className="receipt-total"><span>{t('change')}</span><span>৳ {money(receipt.change)}</span></div>}
+      {receipt.due > 0 && <div className="receipt-total"><span>{t('due')}</span><span>৳ {money(receipt.due)}</span></div>}
+    </div>
+    <div className="receipt-footer"><p className="receipt-thanks">{t('thanks')}</p><p className="receipt-local">{t('localReceipt')}</p></div>
   </div>
 
   return <div ref={motionRoot} className={`app-shell lang-${lang}`}>
@@ -773,11 +790,6 @@ export default function App() {
                         </div>
                       )}
                     </div>
-                    {hasVariants && (
-                      <div className="variant-nav-hint" title={t('selectVariant')}>
-                        <kbd>←</kbd><kbd>→</kbd><span>{t('variants')}</span>
-                      </div>
-                    )}
                     <label className="quantity-field">
                       <span className="sr-only">{isMoneyUnit(currentVariant.unit) ? t('topUpAmount') : t('quantity')}</span>
                       <input
@@ -817,7 +829,7 @@ export default function App() {
               {!state.lines.length && <div className="empty-state bill-empty"><div className="empty-pixel"><PixelMark/></div><h3>{t('emptyBill')}</h3><p>{t('emptyBillHint')}</p><button className="text-button" onClick={goSearch}>{t('findItem')} <kbd>F2</kbd></button></div>}
               {state.lines.length > 0 && <div className="bill-end"><span/><Icon name="plus" size={13}/><span/></div>}
             </div>
-            <div className="bill-summary"><div className="summary-row"><span>{t('subtotal')}<small>{state.lines.length} {t('items')}</small></span><span>৳ {money(billSubtotal)}</span></div><div className="summary-row"><button className="discount-button" onClick={() => { setDiscountInput(state.discount ? (state.discount / 100).toFixed(2) : ''); openDialog('discount') }} disabled={!state.lines.length}><Icon name="plus" size={13}/>{state.discount ? t('discount') : t('addDiscount')}</button><span>{state.discount ? `− ৳ ${money(state.discount)}` : '—'}</span></div><div className="total-row"><div><span>{t('total')}</span><small>BDT</small></div><strong><span>৳</span>{money(billTotal)}</strong></div><button className="payment-button" onClick={openPayment} disabled={!state.lines.length || !ready}><span>{t('payment')}</span><span className="payment-button-right"><kbd>+</kbd><Icon name="arrow" size={23}/></span></button><div className="payment-caption"><span>{t('paymentHint')} <kbd>+</kbd></span><span className={`save-status ${storageStatus}`}><i/>{t(storageStatus === 'saved' ? 'deviceOnly' : storageStatus === 'saving' ? 'saving' : 'storageError')}</span></div></div>
+            <div className="bill-summary"><div className="summary-row"><span>{t('subtotal')}<small>{state.lines.length} {t('items')}</small></span><span>৳ {money(billSubtotal)}</span></div><div className="summary-row"><button className="discount-button" onClick={() => { setDiscountInput(state.discount ? (state.discount / 100).toFixed(2) : ''); openDialog('discount') }} disabled={!state.lines.length}><Icon name="plus" size={13}/>{state.discount ? t('discount') : t('addDiscount')}</button><span>{state.discount ? `− ৳ ${money(state.discount)}` : '—'}</span></div><div className="total-row"><div><span>{t('total')}</span><small>BDT</small></div><strong><span>৳</span>{money(billTotal)}</strong></div><button className="payment-button" onClick={openPayment} disabled={!state.lines.length || !ready}><span>{t('payment')}</span><span className="payment-button-right"><Icon name="arrow" size={23}/></span></button><div className="payment-caption"><span>{t('paymentHint')} <kbd>+</kbd></span><span className={`save-status ${storageStatus}`}><i/>{t(storageStatus === 'saved' ? 'deviceOnly' : storageStatus === 'saving' ? 'saving' : 'storageError')}</span></div></div>
           </section>
         </div> : <section className="secondary-view" key={view}>
           <div className="metrics-grid">{(view === 'inventory' ? [

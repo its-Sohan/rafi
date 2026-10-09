@@ -10,7 +10,7 @@ const en = {
   product: 'ITEM', price: 'PRICE', fromPrice: 'from', stock: 'STOCK', code: 'CODE', quantity: 'QTY', amount: 'AMOUNT',
   currentBill: 'Current bill', items: 'items', walkIn: 'Cash customer', chooseCustomer: 'Pick customer',
   clear: 'Clear bill', subtotal: 'Subtotal', discount: 'Discount', addDiscount: 'Add discount', total: 'Total to pay',
-  payment: 'Take payment', paymentHint: 'or press +', itemHint: 'Click an item to get started',
+  payment: 'Take payment', paymentHint: 'or press', itemHint: 'Click an item to get started',
   addItem: 'Add to bill', unitPrice: 'Price per unit', back: 'Back', cancel: 'Cancel',
   findItem: 'Find item', navigate: 'Move', select: 'Choose', pay: 'Payment', shortcuts: 'Shortcuts',
   deviceOnly: 'Saved on device', saving: 'Saving…', storageError: 'Cannot save — please download backup',
